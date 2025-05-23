@@ -3,7 +3,7 @@ precision highp float;
 uniform float time;
 uniform samplerCube envMap;
 
-float uWavesAmplitude = 0.02;
+float uWavesAmplitude = 0.025;
 float uWavesSpeed = 0.4;
 float uWavesFrequency = .5;
 float uWavesPersistence = 0.3;
@@ -81,7 +81,7 @@ void main() {
 
   float elevation = getElevation(modelPosition.x, modelPosition.z);
   uWavesFrequency = 0.05;
-  float elevation2 = getElevation(modelPosition.x, modelPosition.z) * 5.;
+  float elevation2 = getElevation(modelPosition.x, modelPosition.z) * 3.;
   noise = elevation2 ;
   modelPosition.y += elevation + elevation2;
   uWavesFrequency = .5;

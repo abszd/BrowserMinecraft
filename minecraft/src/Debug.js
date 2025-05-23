@@ -28,6 +28,7 @@ class Debug {
             position: this.createLine("Position"),
             lookDirection: this.createLine("Looking"),
             seed: this.createLine("World Seed"),
+            holding: this.createLine("Holding"),
         };
 
         document.addEventListener("keydown", (e) => {
@@ -71,6 +72,9 @@ class Debug {
             2
         )}, ${direction.y.toFixed(2)}, ${direction.z.toFixed(2)}`;
         this.lines.seed.textContent = `${chunkManager.worldSeed}`;
+        this.lines.holding.textContent = `${
+            chunkManager.idBlockTypeLookup[player.holding]
+        }`;
     }
 }
 

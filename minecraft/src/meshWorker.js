@@ -26,7 +26,6 @@ class MeshWorker {
         const worldOffsetZ = chunkZ * size;
         let rects = [];
 
-        // Convert Map back from serialized format
         const chunkGrid = new Map(grid);
 
         // X-AXIS faces
@@ -43,7 +42,6 @@ class MeshWorker {
                     const blockId = this.getBlock(chunkGrid, x, y, z);
 
                     if (blockId !== -1 && blockId !== 5) {
-                        // East face (x+1)
                         let neighbor =
                             x === size - 1
                                 ? -1
@@ -55,7 +53,6 @@ class MeshWorker {
                             maskE[y][z] = blockId;
                         }
 
-                        // West face (x-1)
                         neighbor =
                             x === 0
                                 ? -1
@@ -106,7 +103,6 @@ class MeshWorker {
                     const blockId = this.getBlock(chunkGrid, x, y, z);
 
                     if (blockId !== -1 && blockId !== 5) {
-                        // North face (z+1)
                         let neighbor =
                             z === size - 1
                                 ? -1
@@ -118,7 +114,6 @@ class MeshWorker {
                             maskN[y][x] = blockId;
                         }
 
-                        // South face (z-1)
                         neighbor =
                             z === 0
                                 ? -1
@@ -169,7 +164,6 @@ class MeshWorker {
                     const blockId = this.getBlock(chunkGrid, x, y, z);
 
                     if (blockId !== -1 && blockId !== 5) {
-                        // Upper face (y+1)
                         const upperNeighbor = this.getBlock(
                             chunkGrid,
                             x,
@@ -183,7 +177,6 @@ class MeshWorker {
                             maskU[x][z] = blockId;
                         }
 
-                        // Lower face (y-1)
                         const lowerNeighbor = this.getBlock(
                             chunkGrid,
                             x,
@@ -242,10 +235,8 @@ class MeshWorker {
                 let ry1 = i,
                     ry2 = i;
 
-                // Expand horizontally
                 while (++rx2 < m && slice[i][rx2] === block) {}
 
-                // Expand vertically
                 while (++ry2 < n) {
                     let same = true;
                     for (let rx = rx1; rx < rx2; rx++) {
@@ -295,7 +286,6 @@ class MeshWorker {
         const width = x2 - x1;
         const height = y2 - y1;
 
-        // Clear the processed area
         for (let i = y1; i < y2; i++) {
             for (let j = x1; j < x2; j++) {
                 slice[i][j] = -1;
@@ -552,7 +542,6 @@ class MeshWorker {
     }
 }
 
-// Web Worker message handler
 const meshWorker = new MeshWorker();
 
 self.onmessage = function (e) {
@@ -568,10 +557,8 @@ self.onmessage = function (e) {
             case "buildMesh":
                 const { chunkData, waterBlocks } = data;
 
-                // Build terrain mesh
                 const terrainMeshData = meshWorker.createGreedyMesh(chunkData);
 
-                // Build water mesh
                 const waterMeshData =
                     waterBlocks && waterBlocks.length > 0
                         ? meshWorker.buildWaterMesh(

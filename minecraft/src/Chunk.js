@@ -13,9 +13,9 @@ export class Chunk {
         this.mesh = null;
         this.lastAccessed = Date.now();
 
-        this.isGenerating = false; // ChunkWorker is generating terrain
-        this.isGenerated = false; // Terrain generation complete
-        this.isBuildingMesh = false; // MeshWorker is building mesh
+        this.isGenerating = false;
+        this.isGenerated = false;
+        this.isBuildingMesh = false;
         this.isDirty = false;
     }
 

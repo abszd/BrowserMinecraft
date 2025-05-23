@@ -32,7 +32,7 @@ const scene = new Scene();
 const debug = new Debug();
 
 const chunkSize = 16;
-const renderDistance = 8;
+const renderDistance = 12;
 const renderFade = Math.min(renderDistance / 8, 1);
 const worldSeed = 173869420;
 
@@ -74,7 +74,7 @@ const chunkManager = new ChunkManager({
     amplitude: 24,
 });
 
-blockTable.water.texture.side.uniforms.envMap.value = bkg_img;
+blockTable.water.texture.side.uniforms.envMap.value = scene.environment;
 blockTable.leaf.texture.side.uniforms.time.value = 0;
 blockTable.water.texture.side.uniforms.time.value = 0;
 
@@ -183,7 +183,7 @@ function animate() {
             }
         }
     }
-    const targetBlock = player.updateSelectBox(selectionBox, 5);
+    player.updateSelectBox(selectionBox, 5);
     if (fpsTime > 1) {
         debug.update(fpsIter, player, chunkManager);
         lastfps = fpsIter;
@@ -214,13 +214,12 @@ function onWindowResize() {
 window.addEventListener("resize", onWindowResize, false);
 
 async function waitForSpawnChunks() {
-    // Trigger spawn chunks to load
     chunkManager.updateChunks(0, 0);
 
-    console.log("Waiting for spawn chunks to load...");
+    //console.log("Waiting for spawn chunks to load...");
 
     while (!chunkManager.isSpawnAreaLoaded(0, 0)) {
-        await new Promise((resolve) => setTimeout(resolve, 100)); // Wait 100ms
+        await new Promise((resolve) => setTimeout(resolve, 100));
     }
     const spawnLocation = chunkManager.findSpawnLocation(2);
     player.camera.position.set(
@@ -228,7 +227,7 @@ async function waitForSpawnChunks() {
         spawnLocation[1] + 2,
         spawnLocation[2]
     );
-    console.log("Spawn chunks loaded! Starting game...");
+    //console.log("Spawn chunks loaded! Starting game...");
 }
 
 waitForSpawnChunks().then(() => {

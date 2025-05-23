@@ -19,7 +19,6 @@ class ChunkWorker {
     generateChunk(chunkX, chunkZ) {
         const chunk = new WorkerChunk(this, chunkX, chunkZ);
 
-        // Generate all terrain features
         chunk.generateTerrain();
         chunk.createTrees();
         chunk.buildLakes();
@@ -27,7 +26,6 @@ class ChunkWorker {
         const chunkId = `${chunkX},${chunkZ}`;
         this.chunks.set(chunkId, chunk);
 
-        // Return serializable chunk data
         return {
             chunkId: chunkId,
             chunkX: chunkX,
@@ -40,15 +38,20 @@ class ChunkWorker {
         };
     }
 
-    updateBlock(chunkId, x, y, z, blockType) {
+    updateBlock(chunkId, x, y, z, blockType, updateWaterMesh = false) {
         const chunk = this.chunks.get(chunkId);
         if (!chunk) return null;
 
         chunk.setBlock(x, y, z, blockType);
 
+        if (updateWaterMesh) {
+            chunk.buildLakes();
+        }
+
         return {
             chunkId: chunkId,
             grid: Array.from(chunk.grid.entries()),
+            waterBlocks: chunk.waterBlocks,
             lastAccessed: chunk.lastAccessed,
         };
     }
@@ -107,9 +110,9 @@ class WorkerChunk {
 
                 for (let y = 0; y < height; y++) {
                     let blockType;
-                    if (y < height - 4) blockType = 1; // stone
-                    else if (y < height - 1) blockType = 0; // dirt
-                    else blockType = 2; // grass
+                    if (y < height - 4) blockType = 1;
+                    else if (y < height - 1) blockType = 0;
+                    else blockType = 2;
 
                     this.setBlock(localX, y, localZ, blockType);
                 }
@@ -237,13 +240,11 @@ class WorkerChunk {
     buildTree(x, y, z) {
         const treeHeight = 5 + Math.floor(Math.random() * 4);
 
-        // Build trunk
         for (let i = 1; i <= treeHeight; i++) {
             if (y + i >= this.height) break;
-            this.setBlock(x, y + i, z, 3); // oak_log
+            this.setBlock(x, y + i, z, 3);
         }
 
-        // Build leaves
         const leafStart = Math.max(3, treeHeight - 3);
         const leafTop = treeHeight + 1;
 
@@ -276,14 +277,22 @@ class WorkerChunk {
     }
 
     buildLakes() {
+        this.waterBlocks = [];
+
         for (let x = 0; x < this.size; x++) {
             for (let z = 0; z < this.size; z++) {
-                for (let y = 3; y <= this.waterLevel; y++) {
-                    if (y >= this.height) continue;
+                for (let y = 0; y < this.height; y++) {
+                    const blockId = this.getBlock(x, y, z);
 
-                    if (this.getBlock(x, y, z) === -1) {
-                        this.setBlock(x, y, z, 5); // water
+                    if (blockId === 5) {
+                        const blockAbove = this.getBlock(x, y + 1, z);
+                        const isTopWater = blockAbove !== 5;
 
+                        this.waterBlocks.push({ x, y, z, isTopWater });
+                    }
+
+                    if (y >= 3 && y <= this.waterLevel && blockId === -1) {
+                        this.setBlock(x, y, z, 5);
                         const isTopWater = y === this.waterLevel;
                         this.waterBlocks.push({ x, y, z, isTopWater });
                     }
@@ -297,11 +306,12 @@ class WorkerChunk {
         const key = `${x} ${y} ${z}`;
 
         if (blockType === -1 || blockType === null) {
-            //console.log(this.grid.values());
             this.grid.delete(key);
-            //console.log(this.grid.has(key));
         } else {
             this.grid.set(key, blockType);
+            if (this.grid.get(`${x} ${y - 1} ${z}`) === 2) {
+                this.grid.set(`${x} ${y - 1} ${z}`, 0);
+            }
         }
     }
 
@@ -361,7 +371,6 @@ class WorkerChunk {
     }
 }
 
-// Worker message handler
 const chunkWorker = new ChunkWorker();
 
 self.onmessage = function (e) {
@@ -402,7 +411,8 @@ self.onmessage = function (e) {
                     x,
                     y,
                     z,
-                    blockType
+                    blockType,
+                    e.data.updateWaterMesh
                 );
                 if (updatedData) {
                     self.postMessage({

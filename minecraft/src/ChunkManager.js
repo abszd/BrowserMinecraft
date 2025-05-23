@@ -9,9 +9,9 @@ class ChunkManager {
         this.renderDistance = params.renderDistance || 4;
 
         this.TRANSPARENT_BLOCKS = new Set();
-        this.TRANSPARENT_BLOCKS.add(-1); // Air
-        this.TRANSPARENT_BLOCKS.add(4); // Water
-        this.TRANSPARENT_BLOCKS.add(5); // Leaves
+        this.TRANSPARENT_BLOCKS.add(-1);
+        this.TRANSPARENT_BLOCKS.add(4);
+        this.TRANSPARENT_BLOCKS.add(5);
 
         this.amplitude = params.amplitude || 64;
         this.chunks = new Map(); // "chunkX,chunkZ" -> Chunk
@@ -22,6 +22,7 @@ class ChunkManager {
         Object.entries(this.blockTable).forEach((key) => {
             this.idBlockTypeLookup[key[1].guid] = key[0];
         });
+        this.idBlockTypeLookup[-1] = "air";
         this.scene = params.scene;
         this.chunkGroup = new Group();
         this.scene.add(this.chunkGroup);
@@ -31,9 +32,8 @@ class ChunkManager {
             this.renderDistance * this.renderDistance * 4
         );
 
-        // PHASE 1: Dual Worker System
         this.chunkWorker = null; // For terrain generation
-        this.meshWorker = null; // For mesh building (existing)
+        this.meshWorker = null; // For mesh building
         this.pendingGeneration = new Map(); // chunkId -> chunk (waiting for terrain)
         this.pendingMeshes = new Map(); // chunkId -> chunk (waiting for mesh)
 
@@ -71,7 +71,6 @@ class ChunkManager {
     }
 
     initializeWorkerData() {
-        // Initialize ChunkWorker
         if (this.chunkWorker) {
             this.chunkWorker.postMessage({
                 type: "initialize",
@@ -86,7 +85,6 @@ class ChunkManager {
             });
         }
 
-        // Initialize MeshWorker (existing code)
         if (this.meshWorker) {
             const workerBlockTable = {};
             Object.entries(this.blockTable).forEach(([key, value]) => {
@@ -203,7 +201,6 @@ class ChunkManager {
         // );
         this.pendingMeshes.set(chunkId, chunk);
 
-        // Send to mesh worker (reuse existing protocol)
         this.meshWorker.postMessage({
             type: "buildMesh",
             data: {
@@ -268,7 +265,11 @@ class ChunkManager {
         const chunk = this.chunks.get(chunkData.chunkId);
         //console.log(chunk);
         if (chunk) {
+            if (chunkData.waterBlocks) {
+                chunk.waterBlocks = chunkData.waterBlocks;
+            }
             chunk.updateFromWorker(chunkData);
+
             if (this.activeChunks.has(chunk)) {
                 this.dirtyChunks.add(chunk);
                 //this.requestMesh(chunk, chunkData);
@@ -280,11 +281,7 @@ class ChunkManager {
         const chunk = this.pendingGeneration.get(chunkId);
         if (chunk) {
             this.pendingGeneration.delete(chunkId);
-            // Fallback to main thread generation
             console.warn("Error With Chunk:", chunkId);
-            // chunk.generateTerrainMainThread();
-            // chunk.buildMeshMainThread();
-            // this.addChunkToScene(chunk);
         }
     }
 
@@ -306,7 +303,6 @@ class ChunkManager {
             chunk = new Chunk(this, chunkX, chunkZ);
             this.chunks.set(key, chunk);
 
-            // Request terrain generation from worker
             this.requestChunkGeneration(chunk);
         }
 
@@ -316,12 +312,7 @@ class ChunkManager {
     requestChunkGeneration(chunk) {
         const chunkId = `${chunk.chunkX},${chunk.chunkZ}`;
         if (!this.chunkWorker || !this.workersInitialized) {
-            // Fallback to main thread
             console.warn("Error With Chunk:", chunkId);
-
-            // chunk.generateTerrainMainThread();
-            // chunk.buildMeshMainThread();
-            // this.addChunkToScene(chunk);
             return;
         }
 
@@ -349,11 +340,31 @@ class ChunkManager {
         const chunkId = `${chunkX},${chunkZ}`;
 
         if (!chunk.isGenerated) {
-            // Wait for generation to complete
             return;
         }
 
-        // Update via worker
+        const waterGuid = 5;
+        const adjacentPositions = [
+            [x + 1, y, z],
+            [x - 1, y, z],
+            [x, y + 1, z],
+            [x, y - 1, z],
+            [x, y, z + 1],
+            [x, y, z - 1],
+        ];
+
+        const adjacentChunks = new Set();
+        for (const [adjX, adjY, adjZ] of adjacentPositions) {
+            if (this.getBlock(adjX, adjY, adjZ) === waterGuid) {
+                const { chunkX: adjChunkX, chunkZ: adjChunkZ } =
+                    this.worldToChunkCoords(adjX, adjY, adjZ);
+                const adjChunk = this.getChunk(adjChunkX, adjChunkZ, false);
+                if (adjChunk) {
+                    adjacentChunks.add(adjChunk);
+                }
+            }
+        }
+
         if (this.chunkWorker && this.workersInitialized) {
             this.chunkWorker.postMessage({
                 type: "updateBlock",
@@ -362,7 +373,12 @@ class ChunkManager {
                 y: localY,
                 z: localZ,
                 blockType: blockType,
+                updateWaterMesh: adjacentChunks.size > 0,
             });
+        }
+
+        for (const adjChunk of adjacentChunks) {
+            this.dirtyChunks.add(adjChunk);
         }
 
         if (localX === 0) {
@@ -383,12 +399,9 @@ class ChunkManager {
     }
 
     findSpawnLocation(objHeight = 2) {
-        // Generate spawn chunk with worker first
         let chunk = this.getChunk(0, 0, true);
 
         if (!chunk.isGenerated) {
-            // For now, return a default location
-            // In a real implementation, you'd wait for the chunk to generate
             return [
                 this.chunkSize / 2,
                 this.chunkHeight / 2,
@@ -438,7 +451,6 @@ class ChunkManager {
     }
 
     activateChunk(chunk) {
-        // Chunk will be added to scene when generation+mesh building completes
         if (chunk.mesh) {
             this.chunkGroup.add(chunk.mesh);
         }
@@ -460,7 +472,6 @@ class ChunkManager {
     updateDirtyChunks() {
         for (const chunk of this.dirtyChunks) {
             if (this.activeChunks.has(chunk) && chunk.isGenerated) {
-                // Re-request mesh generation
                 this.requestMesh(chunk, {
                     grid: Array.from(chunk.grid.entries()),
                     waterBlocks: chunk.waterBlocks,
@@ -504,11 +515,9 @@ class ChunkManager {
         }
         const key = `${chunk.chunkX},${chunk.chunkZ}`;
 
-        // Remove from all tracking
         this.pendingGeneration.delete(key);
         this.pendingMeshes.delete(key);
 
-        // Tell worker to unload
         if (this.chunkWorker) {
             this.chunkWorker.postMessage({
                 type: "unloadChunk",
