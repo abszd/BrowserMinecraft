@@ -53,7 +53,7 @@ renderer.domElement.addEventListener("click", () => {
     player.controls.lock();
 });
 
-let bkg_img = new TextureLoader().load("../textures/sky.png");
+let bkg_img = new TextureLoader().load("/textures/sky.png");
 bkg_img.mapping = EquirectangularReflectionMapping;
 
 let env_img = bkg_img.clone();
