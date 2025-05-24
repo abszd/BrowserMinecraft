@@ -16,7 +16,10 @@ import {
 import { Player } from "./Player.js";
 import { Debug } from "./Debug.js";
 
-const renderer = new WebGLRenderer({ antialias: true });
+const renderer = new WebGLRenderer({
+    antialias: true,
+    powerPreference: "high-performance",
+});
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(window.devicePixelRatio);
 renderer.domElement.style.position = "absolute";
@@ -111,6 +114,7 @@ const player = new Player(
     chunkSize * renderDistance * 2,
     chunkManager
 );
+chunkManager.camera = player.camera;
 loadingManager.onLoad = function () {
     resourcesLoaded = true;
     console.log("All resources loaded!");
@@ -135,17 +139,14 @@ loadingScreen.style.fontSize = "24px";
 loadingScreen.style.zIndex = "1000";
 loadingScreen.textContent = "Loading world...";
 document.body.appendChild(loadingScreen);
-
-let fpsTime = 1;
-let fpsIter = 60;
-let lastfps = 60;
-
+let iter = -1;
+let fps = 0;
+let last = 0;
+const fpsUpdate = 5;
 function animate() {
     requestAnimationFrame(animate);
     const delta = clock.getDelta();
     now += delta;
-    fpsTime += delta;
-    fpsIter++;
 
     if (resourcesLoaded && loadingScreen.parentNode) {
         if (introStartTime === null) {
@@ -172,15 +173,12 @@ function animate() {
     player.updatePosition(delta);
     player.updateSelectBox(selectionBox, 5);
     player.updateMouse();
-
-    if (fpsTime > 1) {
-        debug.update(fpsIter, player, chunkManager);
-        lastfps = fpsIter;
-        fpsTime = 0;
-        fpsIter = 0;
-    } else {
-        debug.update(lastfps, player, chunkManager);
+    if (iter++ % fpsUpdate === 0) {
+        last = Math.round(fpsUpdate / fps);
+        fps = 0;
     }
+    fps += delta;
+    debug.update(last, player, chunkManager);
 
     blockTable.leaf.texture.side.uniforms.time.value += delta * 0.5;
     blockTable.water.texture.side.uniforms.time.value += delta * 0.5;

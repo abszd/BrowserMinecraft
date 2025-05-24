@@ -66,7 +66,7 @@ class Player {
         this.mouseButton = 0;
         this.lastBreakTime = 0;
         this.lastPlaceTime = 0;
-        this.breakInterval = 100;
+        this.breakInterval = 200;
         this.placeInterval = 200;
         this.epsilon = 0.01;
 

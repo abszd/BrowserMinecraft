@@ -24,7 +24,7 @@ class Debug {
         this.lines = {
             fps: this.createLine("FPS"),
             chunk: this.createLine("Chunk"),
-            activeChunks: this.createLine("Active Chunks"),
+            activeChunks: this.createLine("T|A|C Chunks"),
             loadedChunks: this.createLine("Loaded Chunks"),
             position: this.createLine("Position"),
             lookDirection: this.createLine("Looking"),
@@ -62,7 +62,7 @@ class Debug {
         const slider = document.createElement("input");
         slider.type = "range";
         slider.min = "2";
-        slider.max = "16";
+        slider.max = "32";
         slider.value = this.chunkManager.renderDistance;
         slider.step = "1";
         slider.style.width = "100%";
@@ -127,7 +127,7 @@ class Debug {
 
         this.lines.fps.textContent = `${fps}`;
         this.lines.chunk.textContent = `${playerChunkX}, ${playerChunkZ}`;
-        this.lines.activeChunks.textContent = `${chunkManager.activeChunks.size}`;
+        this.lines.activeChunks.textContent = `${chunkManager.cullingStats.totalChunks} | ${chunkManager.cullingStats.visibleChunks} | ${chunkManager.cullingStats.culledChunks}`;
         this.lines.loadedChunks.textContent = `${chunkManager.chunks.size}`;
         this.lines.position.textContent = `${position.x.toFixed(2)}, ${(
             position.y - 0.6

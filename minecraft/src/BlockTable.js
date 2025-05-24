@@ -50,11 +50,11 @@ export function getBlockTable(loadTexture, rd, rf) {
                         renderFade: { value: rf },
                     },
                 }),
-                top: shaderMaterial("shader.vs", "grass_shader.fs", {
+                top: shaderMaterial("shader.vs", "shader.fs", {
                     side: FrontSide,
                     uniforms: {
                         colormap: {
-                            value: loadTexture("textures/grass_top.png"),
+                            value: loadTexture("textures/grass_top_old.jpg"),
                         },
                         renderDistance: { value: rd },
                         renderFade: { value: rf },

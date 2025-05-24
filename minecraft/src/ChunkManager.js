@@ -1,4 +1,4 @@
-import { Group } from "three";
+import { Frustum, Group, Matrix4, Box3, Vector3 } from "three";
 import { Chunk } from "./Chunk.js";
 
 class ChunkManager {
@@ -7,6 +7,14 @@ class ChunkManager {
         this.chunkSize = params.chunkSize || 16;
         this.chunkHeight = params.chunkHeight || 128;
         this.renderDistance = params.renderDistance || 4;
+        this.camera = null;
+        this.frustum = new Frustum();
+        this.cameraMatrix = new Matrix4();
+        this.cullingStats = {
+            totalChunks: 0,
+            visibleChunks: 0,
+            culledChunks: 0,
+        };
 
         this.TRANSPARENT_BLOCKS = new Set();
         this.TRANSPARENT_BLOCKS.add(-1);
@@ -341,6 +349,20 @@ class ChunkManager {
         return chunk;
     }
 
+    getChunkBounds(chunk) {
+        const worldX = chunk.chunkX * this.chunkSize;
+        const worldZ = chunk.chunkZ * this.chunkSize;
+
+        return new Box3(
+            new Vector3(worldX, 0, worldZ),
+            new Vector3(
+                worldX + this.chunkSize,
+                this.chunkHeight,
+                worldZ + this.chunkSize
+            )
+        );
+    }
+
     requestChunkGeneration(chunk) {
         const chunkId = `${chunk.chunkX},${chunk.chunkZ}`;
         if (!this.chunkWorker || !this.workersInitialized) {
@@ -444,6 +466,27 @@ class ChunkManager {
         return chunk.findSpawnLocation(objHeight) || [0, this.chunkHeight, 0];
     }
 
+    performFrustumCulling() {
+        this.cullingStats.totalChunks = this.activeChunks.size;
+        this.cullingStats.visibleChunks = 0;
+        this.cullingStats.culledChunks = 0;
+
+        for (const chunk of this.activeChunks) {
+            if (!chunk.mesh) continue;
+
+            const chunkBounds = this.getChunkBounds(chunk);
+            const isVisible = this.frustum.intersectsBox(chunkBounds);
+
+            chunk.mesh.visible = isVisible;
+
+            if (isVisible) {
+                this.cullingStats.visibleChunks++;
+            } else {
+                this.cullingStats.culledChunks++;
+            }
+        }
+    }
+
     updateChunks(playerX, playerZ) {
         const playerChunkX = Math.floor(playerX / this.chunkSize);
         const playerChunkZ = Math.floor(playerZ / this.chunkSize);
@@ -480,6 +523,14 @@ class ChunkManager {
         this.activeChunks = newActiveChunks;
         this.enforceChunkLimit();
         this.updateDirtyChunks();
+        if (this.camera) {
+            this.cameraMatrix.multiplyMatrices(
+                this.camera.projectionMatrix,
+                this.camera.matrixWorldInverse
+            );
+            this.frustum.setFromProjectionMatrix(this.cameraMatrix);
+            this.performFrustumCulling();
+        }
     }
 
     activateChunk(chunk) {
