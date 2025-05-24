@@ -41,6 +41,38 @@ class ChunkManager {
         this.initializeWorkers();
     }
 
+    updateRenderDistances(distance) {
+        const fade = Math.min(this.chunkSize, distance / 8);
+        Object.values(this.blockTable).forEach((block) => {
+            if (
+                block.texture.side &&
+                block.texture.side.uniforms &&
+                block.texture.side.uniforms.renderDistance
+            ) {
+                block.texture.side.uniforms.renderDistance.value = distance;
+                block.texture.side.uniforms.renderFade.value = fade;
+            }
+
+            if (
+                block.texture.top &&
+                block.texture.top.uniforms &&
+                block.texture.top.uniforms.renderDistance
+            ) {
+                block.texture.top.uniforms.renderDistance.value = distance;
+                block.texture.top.uniforms.renderFade.value = fade;
+            }
+
+            if (
+                block.texture.bottom &&
+                block.texture.bottom.uniforms &&
+                block.texture.bottom.uniforms.renderDistance
+            ) {
+                block.texture.bottom.uniforms.renderDistance.value = distance;
+                block.texture.bottom.uniforms.renderFade.value = fade;
+            }
+        });
+    }
+
     initializeWorkers() {
         try {
             this.chunkWorker = new Worker(

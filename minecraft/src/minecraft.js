@@ -43,7 +43,6 @@ document.body.appendChild(crosshair);
 document.body.appendChild(renderer.domElement);
 
 const scene = new Scene();
-const debug = new Debug();
 
 const chunkSize = 16;
 const renderDistance = 12;
@@ -87,6 +86,7 @@ const chunkManager = new ChunkManager({
     blockTable: blockTable,
     amplitude: 48,
 });
+const debug = new Debug(chunkManager);
 
 blockTable.water.texture.side.uniforms.envMap.value = scene.environment;
 blockTable.leaf.texture.side.uniforms.time.value = 0;
@@ -97,34 +97,6 @@ const spawnLocation = chunkManager.findSpawnLocation();
 scene.add(chunkManager.chunkGroup);
 
 const clock = new Clock();
-
-function updateRenderDistances(distance) {
-    Object.values(blockTable).forEach((block) => {
-        if (
-            block.texture.side &&
-            block.texture.side.uniforms &&
-            block.texture.side.uniforms.renderDistance
-        ) {
-            block.texture.side.uniforms.renderDistance.value = distance;
-        }
-
-        if (
-            block.texture.top &&
-            block.texture.top.uniforms &&
-            block.texture.top.uniforms.renderDistance
-        ) {
-            block.texture.top.uniforms.renderDistance.value = distance;
-        }
-
-        if (
-            block.texture.bottom &&
-            block.texture.bottom.uniforms &&
-            block.texture.bottom.uniforms.renderDistance
-        ) {
-            block.texture.bottom.uniforms.renderDistance.value = distance;
-        }
-    });
-}
 
 let currentRenderDistance = 0;
 const targetRenderDistance = (renderDistance - 1) * chunkSize;
@@ -190,7 +162,7 @@ function animate() {
             const easedProgress = 1 - Math.pow(1 - progress, 3);
 
             currentRenderDistance = easedProgress * targetRenderDistance;
-            updateRenderDistances(currentRenderDistance);
+            chunkManager.updateRenderDistances(currentRenderDistance);
 
             if (progress >= 1.0) {
                 introCompleted = true;
