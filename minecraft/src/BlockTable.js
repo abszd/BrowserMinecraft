@@ -6,11 +6,11 @@ export function getBlockTable(loadTexture, rd, rf) {
         dirt: {
             transparent: true,
             texture: {
-                side: shaderMaterial("/shader.vs", "/shader.fs", {
+                side: shaderMaterial("shader.vs", "shader.fs", {
                     side: FrontSide,
                     uniforms: {
                         colormap: {
-                            value: loadTexture("/textures/dirt.png"),
+                            value: loadTexture("textures/dirt.png"),
                         },
                         renderDistance: { value: rd },
                         renderFade: { value: rf },
@@ -23,11 +23,11 @@ export function getBlockTable(loadTexture, rd, rf) {
         },
         stone: {
             texture: {
-                side: shaderMaterial("/shader.vs", "/shader.fs", {
+                side: shaderMaterial("shader.vs", "shader.fs", {
                     side: FrontSide,
                     uniforms: {
                         colormap: {
-                            value: loadTexture("/textures/stone.png"),
+                            value: loadTexture("textures/stone.png"),
                         },
                         renderDistance: { value: rd },
                         renderFade: { value: rf },
@@ -40,31 +40,31 @@ export function getBlockTable(loadTexture, rd, rf) {
         },
         grass: {
             texture: {
-                side: shaderMaterial("/shader.vs", "/shader.fs", {
+                side: shaderMaterial("shader.vs", "shader.fs", {
                     side: FrontSide,
                     uniforms: {
                         colormap: {
-                            value: loadTexture("/textures/grass_side.png"),
+                            value: loadTexture("textures/grass_side.png"),
                         },
                         renderDistance: { value: rd },
                         renderFade: { value: rf },
                     },
                 }),
-                top: shaderMaterial("/shader.vs", "/shader.fs", {
+                top: shaderMaterial("shader.vs", "grass_shader.fs", {
                     side: FrontSide,
                     uniforms: {
                         colormap: {
-                            value: loadTexture("/textures/grass_top.jpg"),
+                            value: loadTexture("textures/grass_top.png"),
                         },
                         renderDistance: { value: rd },
                         renderFade: { value: rf },
                     },
                 }),
-                bottom: shaderMaterial("/shader.vs", "/shader.fs", {
+                bottom: shaderMaterial("shader.vs", "shader.fs", {
                     side: FrontSide,
                     uniforms: {
                         colormap: {
-                            value: loadTexture("/textures/dirt.png"),
+                            value: loadTexture("textures/dirt.png"),
                         },
                         renderDistance: { value: rd },
                         renderFade: { value: rf },
@@ -77,31 +77,31 @@ export function getBlockTable(loadTexture, rd, rf) {
         },
         oak_log: {
             texture: {
-                side: shaderMaterial("/shader.vs", "/shader.fs", {
+                side: shaderMaterial("shader.vs", "shader.fs", {
                     side: FrontSide,
                     uniforms: {
                         colormap: {
-                            value: loadTexture("/textures/oak_log.png"),
+                            value: loadTexture("textures/oak_log.png"),
                         },
                         renderDistance: { value: rd },
                         renderFade: { value: rf },
                     },
                 }),
-                top: shaderMaterial("/shader.vs", "/shader.fs", {
+                top: shaderMaterial("shader.vs", "shader.fs", {
                     side: FrontSide,
                     uniforms: {
                         colormap: {
-                            value: loadTexture("/textures/oak_log_top.png"),
+                            value: loadTexture("textures/oak_log_top.png"),
                         },
                         renderDistance: { value: rd },
                         renderFade: { value: rf },
                     },
                 }),
-                bottom: shaderMaterial("/shader.vs", "/shader.fs", {
+                bottom: shaderMaterial("shader.vs", "shader.fs", {
                     side: FrontSide,
                     uniforms: {
                         colormap: {
-                            value: loadTexture("/textures/oak_log_top.png"),
+                            value: loadTexture("textures/oak_log_top.png"),
                         },
                         renderDistance: { value: rd },
                         renderFade: { value: rf },
@@ -114,12 +114,12 @@ export function getBlockTable(loadTexture, rd, rf) {
         },
         leaf: {
             texture: {
-                side: shaderMaterial("/leaf_shader.vs", "/leaf_shader.fs", {
+                side: shaderMaterial("leaf_shader.vs", "leaf_shader.fs", {
                     side: FrontSide,
                     transparent: true,
                     uniforms: {
                         colormap: {
-                            value: loadTexture("/textures/leaf.png"),
+                            value: loadTexture("textures/leaf.png"),
                         },
                         time: { value: 0.0 },
                         renderDistance: { value: rd },
@@ -134,11 +134,11 @@ export function getBlockTable(loadTexture, rd, rf) {
         },
         water: {
             texture: {
-                side: shaderMaterial("/water_shader.vs", "/water_shader.fs", {
+                side: shaderMaterial("water_shader.vs", "water_shader.fs", {
                     side: DoubleSide,
                     uniforms: {
                         colormap: {
-                            value: loadTexture("/textures/water.png"),
+                            value: loadTexture("textures/water.png"),
                         },
                         time: { value: 0.0 },
                         envMap: { value: null },
@@ -157,12 +157,12 @@ export function getBlockTable(loadTexture, rd, rf) {
         },
         slime: {
             texture: {
-                side: shaderMaterial("/shader.vs", "/leaf_shader.fs", {
+                side: shaderMaterial("shader.vs", "leaf_shader.fs", {
                     side: FrontSide,
                     transparent: true,
                     uniforms: {
                         colormap: {
-                            value: loadTexture("/textures/slime.png"),
+                            value: loadTexture("textures/slime.png"),
                         },
                         renderDistance: { value: rd },
                         renderFade: { value: rf },
@@ -176,31 +176,31 @@ export function getBlockTable(loadTexture, rd, rf) {
         },
         grass_top: {
             texture: {
-                side: shaderMaterial("/shader.vs", "/shader.fs", {
+                side: shaderMaterial("shader.vs", "leaf_shader.fs", {
                     side: FrontSide,
                     uniforms: {
                         colormap: {
-                            value: loadTexture("/textures/grass_top.jpg"),
+                            value: loadTexture("textures/grass_top.png"),
                         },
                         renderDistance: { value: rd },
                         renderFade: { value: rf },
                     },
                 }),
-                top: shaderMaterial("/shader.vs", "/shader.fs", {
+                top: shaderMaterial("shader.vs", "leaf_shader.fs", {
                     side: FrontSide,
                     uniforms: {
                         colormap: {
-                            value: loadTexture("/textures/grass_top.jpg"),
+                            value: loadTexture("textures/grass_top.png"),
                         },
                         renderDistance: { value: rd },
                         renderFade: { value: rf },
                     },
                 }),
-                bottom: shaderMaterial("/shader.vs", "/shader.fs", {
+                bottom: shaderMaterial("shader.vs", "leaf_shader.fs", {
                     side: FrontSide,
                     uniforms: {
                         colormap: {
-                            value: loadTexture("/textures/dirt.png"),
+                            value: loadTexture("textures/dirt.png"),
                         },
                         renderDistance: { value: rd },
                         renderFade: { value: rf },

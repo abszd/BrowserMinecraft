@@ -29,6 +29,7 @@ class Debug {
             lookDirection: this.createLine("Looking"),
             seed: this.createLine("World Seed"),
             holding: this.createLine("Holding"),
+            sprinting: this.createLine("Grounded"),
         };
 
         document.addEventListener("keydown", (e) => {
@@ -75,6 +76,7 @@ class Debug {
         this.lines.holding.textContent = `${
             chunkManager.idBlockTypeLookup[player.holding]
         }`;
+        this.lines.sprinting.textContent = `${player.isGrounded}`;
     }
 }
 

@@ -26,6 +26,20 @@ renderer.domElement.style.width = "100vw";
 renderer.domElement.style.height = "100vh";
 renderer.domElement.style.display = "block";
 
+const crosshair = document.createElement("div");
+crosshair.style.position = "fixed";
+crosshair.style.top = "50%";
+crosshair.style.left = "50%";
+crosshair.style.width = "4px";
+crosshair.style.height = "4px";
+crosshair.style.backgroundColor = "white";
+crosshair.style.borderRadius = "50%";
+crosshair.style.transform = "translate(-50%, -50%)";
+crosshair.style.pointerEvents = "none";
+crosshair.style.zIndex = "1000";
+crosshair.style.boxShadow = "0 0 2px rgba(0, 0, 0, 0.8)";
+document.body.appendChild(crosshair);
+
 document.body.appendChild(renderer.domElement);
 
 const scene = new Scene();
@@ -53,7 +67,7 @@ renderer.domElement.addEventListener("click", () => {
     player.controls.lock();
 });
 
-let bkg_img = new TextureLoader().load("/textures/sky.png");
+let bkg_img = new TextureLoader().load("textures/sky.png");
 bkg_img.mapping = EquirectangularReflectionMapping;
 
 let env_img = bkg_img.clone();
@@ -71,7 +85,7 @@ const chunkManager = new ChunkManager({
     chunkHeight: 128,
     renderDistance: renderDistance,
     blockTable: blockTable,
-    amplitude: 24,
+    amplitude: 48,
 });
 
 blockTable.water.texture.side.uniforms.envMap.value = scene.environment;
@@ -183,7 +197,10 @@ function animate() {
             }
         }
     }
+    player.updatePosition(delta);
     player.updateSelectBox(selectionBox, 5);
+    player.updateMouse();
+
     if (fpsTime > 1) {
         debug.update(fpsIter, player, chunkManager);
         lastfps = fpsIter;
@@ -196,7 +213,6 @@ function animate() {
     blockTable.leaf.texture.side.uniforms.time.value += delta * 0.5;
     blockTable.water.texture.side.uniforms.time.value += delta * 0.5;
 
-    player.updatePosition(delta);
     chunkManager.updateChunks(
         player.camera.position.x,
         player.camera.position.z
