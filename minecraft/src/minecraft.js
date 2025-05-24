@@ -45,7 +45,7 @@ document.body.appendChild(renderer.domElement);
 const scene = new Scene();
 
 const chunkSize = 16;
-const renderDistance = 12;
+const renderDistance = 10;
 const renderFade = Math.min(renderDistance / 8, 1);
 const worldSeed = 173869420;
 
