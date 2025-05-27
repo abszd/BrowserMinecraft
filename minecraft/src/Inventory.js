@@ -69,9 +69,26 @@ export class Inventory {
         for (let i = 0; i < this.width; i++) {
             this.hotbar.childNodes[i].style.border =
                 i === this.holding ? "2px solid #fff" : "2px solid #666";
-            this.hotbar.childNodes[i].style.backgroundColor = this.inventory[i]
-                ? "rgba(50, 200, 50, 0.7)"
-                : "rgba(50, 50, 50, 0.7)";
+
+            if (this.inventory[i]) {
+                this.hotbar.childNodes[i].style.backgroundImage =
+                    "url('icons/grass.png')";
+                this.hotbar.childNodes[i].style.backgroundSize = "contain";
+                this.hotbar.childNodes[i].style.backgroundRepeat = "no-repeat";
+                this.hotbar.childNodes[i].style.backgroundPosition = "center";
+
+                this.hotbar.childNodes[i].textContent = this.inventory[i].count;
+                this.hotbar.childNodes[i].style.textAlign = "right";
+                this.hotbar.childNodes[i].style.verticalAlign = "bottom";
+                this.hotbar.childNodes[i].style.fontSize = "12px";
+                this.hotbar.childNodes[i].style.color = "#fff";
+                this.hotbar.childNodes[i].style.fontWeight = "bold";
+                this.hotbar.childNodes[i].style.textShadow = "1px 1px 0px #000";
+                this.hotbar.childNodes[i].style.lineHeight = "50px"; // Match slot height
+            } else {
+                this.hotbar.childNodes[i].style.backgroundImage = "none";
+                this.hotbar.childNodes[i].textContent = "";
+            }
         }
     }
 
@@ -84,7 +101,7 @@ export class Inventory {
         hotbar.style.transform = "translateX(-50%)";
         hotbar.style.display = "flex";
         hotbar.style.gap = "2px";
-        hotbar.style.backgroundColor = "rgba(0, 0, 0, 0.3)";
+        hotbar.style.backgroundColor = "rgba(0, 0, 0, 0.5)";
         hotbar.style.padding = "8px";
         hotbar.style.borderRadius = "4px";
         hotbar.style.zIndex = "1000";
@@ -96,9 +113,6 @@ export class Inventory {
             slot.style.height = "50px";
             slot.style.border =
                 i === this.holding ? "2px solid #fff" : "2px solid #666";
-            slot.style.backgroundColor = this.inventory[i]
-                ? "rgba(50, 50, 50, 0.7)"
-                : "rgba(50, 50, 50, 0.7)";
             slot.style.display = "flex";
             slot.style.alignItems = "center";
             slot.style.justifyContent = "center";
