@@ -292,6 +292,11 @@ class MeshWorker {
             }
         }
 
+        let face = "side";
+        if (axis === 1) {
+            face = dir === 0 ? "top" : "bottom";
+        }
+
         if (axis === 0) {
             // X-axis
             const x = worldOffsetX + pos + 1 - dir;
@@ -404,16 +409,15 @@ class MeshWorker {
             normals.push(...normal);
         }
 
-        let actualBlockType = blockType;
-        if (blockType === "grass" && axis === 1) {
-            actualBlockType = dir === 0 ? "grass_top" : "dirt";
-        }
+        const meshKey = `${blockType}-${face}`;
 
         return {
             vertices: vertices,
             normals: normals,
             uvs: uvs,
-            blockType: actualBlockType,
+            blockType: blockType,
+            face: face,
+            meshKey: meshKey,
         };
     }
 
@@ -422,23 +426,21 @@ class MeshWorker {
             return {};
         }
 
-        const rectsByType = {};
+        const rectsByMeshKey = {};
 
         for (const rect of rectangles) {
-            const blockType = rect.blockType;
-            if (!blockType || !this.blockTable[blockType]) {
-                continue;
-            }
+            const meshKey = rect.meshKey;
+            if (!meshKey) continue;
 
-            if (!rectsByType[blockType]) {
-                rectsByType[blockType] = [];
+            if (!rectsByMeshKey[meshKey]) {
+                rectsByMeshKey[meshKey] = [];
             }
-            rectsByType[blockType].push(rect);
+            rectsByMeshKey[meshKey].push(rect);
         }
 
-        const meshDataByType = {};
+        const meshDataByKey = {};
 
-        for (const [blockType, rects] of Object.entries(rectsByType)) {
+        for (const [meshKey, rects] of Object.entries(rectsByMeshKey)) {
             const positions = [];
             const normals = [];
             const uvs = [];
@@ -474,7 +476,7 @@ class MeshWorker {
 
             if (positions.length === 0) continue;
 
-            meshDataByType[blockType] = {
+            meshDataByKey[meshKey] = {
                 positions: positions,
                 normals: normals,
                 uvs: uvs,
@@ -482,7 +484,7 @@ class MeshWorker {
             };
         }
 
-        return meshDataByType;
+        return meshDataByKey;
     }
 
     buildWaterMesh(waterBlocks, chunkX, chunkZ, size) {

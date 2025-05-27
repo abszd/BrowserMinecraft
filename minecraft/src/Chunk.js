@@ -45,18 +45,16 @@ export class Chunk {
         this.mesh = new Group();
 
         if (terrainMeshData && Object.keys(terrainMeshData).length > 0) {
-            for (const [blockType, meshData] of Object.entries(
-                terrainMeshData
-            )) {
+            for (const [meshKey, meshData] of Object.entries(terrainMeshData)) {
                 if (meshData.positions.length === 0) continue;
 
-                let material;
-                if (blockType === "grass_top") {
-                    material = this.mgr.blockTable.grass.texture.top;
-                } else if (blockType === "grass_bottom") {
-                    material = this.mgr.blockTable.dirt.texture.side;
-                } else {
-                    material = this.mgr.blockTable[blockType].texture.side;
+                const [blockType, face = "side"] = meshKey.split("-");
+
+                const material = this.getBlockMaterial(blockType, face);
+
+                if (!material) {
+                    console.warn(`No material found for ${blockType} ${face}`);
+                    continue;
                 }
 
                 const geometry = new BufferGeometry();
@@ -103,6 +101,16 @@ export class Chunk {
         }
 
         return this.mesh;
+    }
+    getBlockMaterial(blockType, face) {
+        const blockData = this.mgr.blockTable[blockType];
+        if (!blockData) return null;
+
+        if (blockData.texture[face]) {
+            return blockData.texture[face];
+        }
+
+        return blockData.texture.side || null;
     }
 
     getBlock(x, y, z) {

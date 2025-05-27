@@ -14,7 +14,7 @@ class Debug {
         this.container.style.padding = "15px";
         this.container.style.borderRadius = "5px";
         this.container.style.fontFamily = "monospace, Arial, sans-serif";
-        this.container.style.fontSize = "16px";
+        this.container.style.fontSize = "12px";
         this.container.style.lineHeight = "1.5";
         this.container.style.minWidth = "300px";
         this.container.style.boxShadow = "0 0 10px rgba(0, 0, 0, 0.5)";
@@ -137,7 +137,8 @@ class Debug {
         )}, ${direction.y.toFixed(2)}, ${direction.z.toFixed(2)}`;
         this.lines.seed.textContent = `${chunkManager.worldSeed}`;
         this.lines.holding.textContent = `${
-            chunkManager.idBlockTypeLookup[player.holding] || "None"
+            chunkManager.idBlockTypeLookup[player.inventory.blockInHand] ||
+            "None"
         }`;
         this.lines.sprinting.textContent = `${player.isGrounded}`;
         // renderDistance value is updated by the slider directly

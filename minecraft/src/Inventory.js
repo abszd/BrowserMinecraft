@@ -1,12 +1,14 @@
 export class Inventory {
-    constructor(blockTable, params = {}) {
+    constructor(chunkManager, params = {}) {
         this.width = params.width || 9;
         this.height = params.height || 4;
         this.stackSize = params.stackSize || 64;
+        this.mgr = chunkManager;
         this.inventory = new Array(this.width * this.height).fill(null);
         this.scrollInterval = 50;
         this.lastScroll = 0;
         this.holding = 0;
+        this.blockInHand = null;
         this.open = false;
         this.setupEventListeners();
         this.createHotbarOutline();
@@ -67,27 +69,40 @@ export class Inventory {
 
     updateHotbarOutline() {
         for (let i = 0; i < this.width; i++) {
+            if (i === this.holding) {
+                this.blockInHand = this.inventory[this.holding]
+                    ? this.inventory[this.holding].id
+                    : null;
+            }
             this.hotbar.childNodes[i].style.border =
                 i === this.holding ? "2px solid #fff" : "2px solid #666";
 
             if (this.inventory[i]) {
-                this.hotbar.childNodes[i].style.backgroundImage =
-                    "url('icons/grass.png')";
+                //console.log(this.mgr.idBlockTypeLookup[this.inventory[i].id]);
+                this.hotbar.childNodes[i].style.backgroundImage = `url('icons/${
+                    this.mgr.idBlockTypeLookup[this.inventory[i].id]
+                }.png')`;
                 this.hotbar.childNodes[i].style.backgroundSize = "contain";
                 this.hotbar.childNodes[i].style.backgroundRepeat = "no-repeat";
                 this.hotbar.childNodes[i].style.backgroundPosition = "center";
 
                 this.hotbar.childNodes[i].textContent = this.inventory[i].count;
-                this.hotbar.childNodes[i].style.textAlign = "right";
-                this.hotbar.childNodes[i].style.verticalAlign = "bottom";
+
+                this.hotbar.childNodes[i].style.display = "flex";
+                this.hotbar.childNodes[i].style.alignItems = "flex-end";
+                this.hotbar.childNodes[i].style.justifyContent = "flex-end";
+
                 this.hotbar.childNodes[i].style.fontSize = "12px";
                 this.hotbar.childNodes[i].style.color = "#fff";
                 this.hotbar.childNodes[i].style.fontWeight = "bold";
                 this.hotbar.childNodes[i].style.textShadow = "1px 1px 0px #000";
-                this.hotbar.childNodes[i].style.lineHeight = "50px"; // Match slot height
             } else {
                 this.hotbar.childNodes[i].style.backgroundImage = "none";
                 this.hotbar.childNodes[i].textContent = "";
+
+                this.hotbar.childNodes[i].style.display = "flex";
+                this.hotbar.childNodes[i].style.alignItems = "center";
+                this.hotbar.childNodes[i].style.justifyContent = "center";
             }
         }
     }

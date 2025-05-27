@@ -82,12 +82,11 @@ const blockTable = getBlockTable(loadTexture, 0, renderFade * chunkSize);
 
 const chunkManager = new ChunkManager({
     scene: scene,
-    seed: worldSeed,
     chunkSize: chunkSize,
     chunkHeight: 128,
     renderDistance: renderDistance,
     blockTable: blockTable,
-    amplitude: 48,
+    amplitude: 32,
 });
 const debug = new Debug(chunkManager);
 

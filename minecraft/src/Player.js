@@ -51,7 +51,7 @@ class Player {
         this.velocity = new Vector3(0, 0, 0);
         this.moveSpeed = 4.3337;
         this.flyMult = 4;
-        this.jumpForce = 8.0;
+        this.jumpForce = 7.2;
         this.isGrounded = false;
         this.gravity = 24.0;
         this.stepHeight = 1.333;
@@ -271,24 +271,32 @@ class Player {
                         this.lookingAt.y - 0.5,
                         this.lookingAt.z - 0.5
                     );
-                    this.mgr.setBlock(
-                        this.lookingAt.x - 0.5,
-                        this.lookingAt.y - 0.5,
-                        this.lookingAt.z - 0.5,
-                        null
-                    );
-                    this.lastBreakTime = currentTime;
-                    this.inventory.add(blockid);
+
+                    if (blockid !== -1) {
+                        this.mgr.setBlock(
+                            this.lookingAt.x - 0.5,
+                            this.lookingAt.y - 0.5,
+                            this.lookingAt.z - 0.5,
+                            null
+                        );
+                        this.lastBreakTime = currentTime;
+
+                        this.inventory.add(blockid === 2 ? 0 : blockid);
+                    }
                 }
                 break;
 
             case 1:
-                this.holding = this.mgr.getBlock(
+                const pickedBlockId = this.mgr.getBlock(
                     this.lookingAt.x - 0.5,
                     this.lookingAt.y - 0.5,
                     this.lookingAt.z - 0.5
                 );
 
+                if (pickedBlockId !== -1) {
+                    this.holding = pickedBlockId;
+                    this.inventory.add(pickedBlockId);
+                }
                 break;
 
             case 2:
@@ -302,8 +310,21 @@ class Player {
                         .floor();
 
                     if (this.canPlaceBlock(side.x, side.y, side.z)) {
-                        this.mgr.setBlock(side.x, side.y, side.z, this.holding);
-                        this.lastPlaceTime = currentTime;
+                        const heldItem =
+                            this.inventory.inventory[this.inventory.holding];
+
+                        if (heldItem && heldItem.count > 0) {
+                            this.mgr.setBlock(
+                                side.x,
+                                side.y,
+                                side.z,
+                                heldItem.id
+                            );
+
+                            this.inventory.remove(this.inventory.holding);
+
+                            this.lastPlaceTime = currentTime;
+                        }
                     }
                 }
                 break;

@@ -3,7 +3,7 @@ import { Chunk } from "./Chunk.js";
 
 class ChunkManager {
     constructor(params = {}) {
-        this.worldSeed = params.seed || 69420;
+        this.worldSeed = params.seed || Math.floor(Math.random() * 999999999);
         this.chunkSize = params.chunkSize || 16;
         this.chunkHeight = params.chunkHeight || 128;
         this.renderDistance = params.renderDistance || 4;
@@ -16,10 +16,7 @@ class ChunkManager {
             culledChunks: 0,
         };
 
-        this.TRANSPARENT_BLOCKS = new Set();
-        this.TRANSPARENT_BLOCKS.add(-1);
-        this.TRANSPARENT_BLOCKS.add(4);
-        this.TRANSPARENT_BLOCKS.add(5);
+        this.TRANSPARENT_BLOCKS = new Set([-1, 4, 5]);
 
         this.amplitude = params.amplitude || 64;
         this.chunks = new Map(); // "chunkX,chunkZ" -> Chunk
@@ -52,29 +49,15 @@ class ChunkManager {
     updateRenderDistances(distance) {
         const fade = Math.min(this.chunkSize, distance / 8);
         Object.values(this.blockTable).forEach((block) => {
-            if (
-                block.texture.side &&
-                block.texture.side.uniforms &&
-                block.texture.side.uniforms.renderDistance
-            ) {
-                block.texture.side.uniforms.renderDistance.value = distance;
-                block.texture.side.uniforms.renderFade.value = fade;
-            }
+            block.texture.side.uniforms.renderDistance.value = distance;
+            block.texture.side.uniforms.renderFade.value = fade;
 
-            if (
-                block.texture.top &&
-                block.texture.top.uniforms &&
-                block.texture.top.uniforms.renderDistance
-            ) {
+            if (block.texture.top) {
                 block.texture.top.uniforms.renderDistance.value = distance;
                 block.texture.top.uniforms.renderFade.value = fade;
             }
 
-            if (
-                block.texture.bottom &&
-                block.texture.bottom.uniforms &&
-                block.texture.bottom.uniforms.renderDistance
-            ) {
+            if (block.texture.bottom) {
                 block.texture.bottom.uniforms.renderDistance.value = distance;
                 block.texture.bottom.uniforms.renderFade.value = fade;
             }
@@ -157,7 +140,7 @@ class ChunkManager {
 
         switch (type) {
             case "initialized":
-                console.log("Chunk worker initialized");
+                //console.log("Chunk worker initialized");
                 this.checkWorkersReady();
                 break;
 
@@ -185,7 +168,7 @@ class ChunkManager {
 
         switch (type) {
             case "initialized":
-                console.log("Mesh worker initialized");
+                //console.log("Mesh worker initialized");
                 this.checkWorkersReady();
                 break;
 
@@ -208,7 +191,7 @@ class ChunkManager {
                 }
             });
 
-            console.log("Both workers ready!");
+            //console.log("Both workers ready!");
         }
     }
 
@@ -284,15 +267,19 @@ class ChunkManager {
         const playerChunkX = Math.floor(playerX / this.chunkSize);
         const playerChunkZ = Math.floor(playerZ / this.chunkSize);
 
-        const spawnRadius = Math.min(2, this.renderDistance);
+        const spawnRadius = Math.max(4, this.renderDistance - 1);
 
         for (let dx = -spawnRadius; dx <= spawnRadius; dx++) {
             for (let dz = -spawnRadius; dz <= spawnRadius; dz++) {
+                if (Math.floor(Math.sqrt(dx * dx + dz * dz)) > spawnRadius) {
+                    continue;
+                }
                 const chunkX = playerChunkX + dx;
                 const chunkZ = playerChunkZ + dz;
                 const chunk = this.getChunk(chunkX, chunkZ, false);
 
                 if (!chunk || !chunk.isGenerated || !chunk.mesh) {
+                    console.log(dx);
                     return false;
                 }
             }
