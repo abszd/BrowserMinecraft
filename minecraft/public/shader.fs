@@ -4,11 +4,14 @@ varying vec3 v_worldNormal;
 varying vec3 v_position;
 varying vec3 v_worldPos;
 varying vec3 viewDir;
+varying vec2 v_atlasOffset;
 
 uniform sampler2D colormap;
 uniform float time;
 uniform float renderDistance;
 uniform float renderFade;
+uniform vec2 atlasSize;
+uniform vec2 tileSize;
 
 vec3 lightDir = normalize(vec3(1., .7, .8));
 vec3 sunColor = vec3(1.0, 0.95, 0.8);
@@ -16,17 +19,20 @@ vec3 sunColor = vec3(1.0, 0.95, 0.8);
 void main() {
     float fogFactor = smoothstep(renderDistance - renderFade, renderDistance, length(vec2(v_worldPos.x - cameraPosition.x, v_worldPos.z - cameraPosition.z)));
     if(fogFactor >= 1.){ discard; }
-    vec4 texColor = texture2D(colormap, v_uv);
+    
+    vec2 tiledUV = fract(v_uv);
+    vec2 tileUV = tiledUV * (tileSize / atlasSize);
+    vec2 atlasUV = (v_atlasOffset / atlasSize) + tileUV;
+    
+    vec4 texColor = texture2D(colormap, atlasUV);
     
     vec3 viewDir = normalize(cameraPosition - v_worldPos);
 
-    // diffuse/directional light
     float diffuse = max(dot(v_worldNormal, lightDir), 0.2);
     diffuse += 0.5 * max(dot(v_normal, lightDir), 0.2);
     float backLight = max(0.0, dot(-lightDir, v_normal)) * 0.3;
     diffuse = pow(diffuse + backLight, 0.8) * 0.75 + 0.25;
 
-    //specular
     float skyLight = max(v_normal.y, 0.0) * 0.2 + 0.2;
     vec3 halfDir = normalize(lightDir + viewDir);
     float specular = pow(max(dot(v_normal, halfDir), 0.0), 16.0) * 0.1;
@@ -34,7 +40,6 @@ void main() {
     vec3 finalColor = texColor.rgb * (diffuse * sunColor + vec3(0.6, 0.7, 1.0) * skyLight);
     finalColor += specular * sunColor; 
     
-    //saturation
     float luminance = dot(finalColor, vec3(0.299, 0.587, 0.114));
     float saturationFactor = 2.; 
     finalColor = mix(vec3(luminance), finalColor, saturationFactor);

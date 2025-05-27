@@ -1,16 +1,25 @@
 class MeshWorker {
     constructor() {
-        this.TRANSPARENT_BLOCKS = new Set([-1, 4, 5]); // Air, Water, Leaves
-        this.blockTable = null;
+        this.blocks = new Map();
+        this.blocksByName = new Map();
         this.idBlockTypeLookup = {};
     }
 
-    initialize(blockTableData, transparentBlocks) {
-        this.blockTable = blockTableData;
+    initialize(blocks, transparentBlocks, atlasSize) {
+        this.blocks = new Map(blocks);
         this.TRANSPARENT_BLOCKS = new Set(transparentBlocks);
-        this.idBlockTypeLookup = {};
-        Object.entries(blockTableData).forEach(([key, value]) => {
-            this.idBlockTypeLookup[value.guid] = key;
+        this.atlasSize = atlasSize || { width: 1024, height: 1024 };
+
+        this.blocksByName = new Map();
+        for (const [id, block] of this.blocks) {
+            this.idBlockTypeLookup[block.id] = block.name;
+            this.blocksByName.set(block.name, block);
+        }
+
+        console.log("MeshWorker initialized:", {
+            blocksCount: this.blocks.size,
+            blocksByNameCount: this.blocksByName.size,
+            idLookup: this.idBlockTypeLookup,
         });
     }
 
@@ -18,6 +27,32 @@ class MeshWorker {
         const key = `${x} ${y} ${z}`;
         const blockId = grid.get(key);
         return blockId === undefined ? -1 : blockId;
+    }
+
+    getBlockUV(blockName, side = "default") {
+        const block = this.blocksByName.get(blockName) || this.blocks.get(0);
+
+        const uvCoords =
+            side !== "default" && block.sides[side]
+                ? block.sides[side]
+                : block.uvCoords;
+
+        return {
+            u: uvCoords.x / this.atlasSize.width,
+            v: uvCoords.y / this.atlasSize.height,
+            uWidth: uvCoords.width / this.atlasSize.width,
+            vHeight: uvCoords.height / this.atlasSize.height,
+        };
+    }
+
+    getFaceType(blockType, axis, dir) {
+        const block = this.blocksByName.get(blockType);
+
+        if (block.sides) {
+            if (axis === 1 && dir === 0) return "top";
+            if (axis === 1 && dir === 1) return "bottom";
+        }
+        return "default";
     }
 
     createGreedyMesh(chunkData) {
@@ -282,9 +317,19 @@ class MeshWorker {
         worldOffsetZ = 0
     ) {
         const blockType = this.idBlockTypeLookup[slice[y1][x1]];
-        let vertices, normal, uvs;
+        let vertices, normal, uvs, atlasOffsets;
         const width = x2 - x1;
         const height = y2 - y1;
+
+        // Get the block and face type
+        const faceType = this.getFaceType(blockType, axis, dir);
+        const block = this.blocksByName.get(blockType) || this.blocks.get(0);
+
+        // Get RAW UV coordinates (pixel coordinates, not normalized)
+        const rawUVCoords =
+            faceType !== "default" && block.sides && block.sides[faceType]
+                ? block.sides[faceType]
+                : block.uvCoords;
 
         for (let i = y1; i < y2; i++) {
             for (let j = x1; j < x2; j++) {
@@ -326,6 +371,7 @@ class MeshWorker {
                           worldOffsetZ + x2,
                       ];
             normal = dir === 0 ? [1, 0, 0] : [-1, 0, 0];
+            // Simple UVs for shader tiling - just the repeat counts
             uvs = [0, 0, width, 0, width, height, 0, height];
         } else if (axis === 1) {
             // Y-axis
@@ -404,16 +450,24 @@ class MeshWorker {
             normals.push(...normal);
         }
 
-        let actualBlockType = blockType;
-        if (blockType === "grass" && axis === 1) {
-            actualBlockType = dir === 0 ? "grass_top" : "dirt";
-        }
+        // Use RAW pixel coordinates for atlas offsets (not normalized)
+        atlasOffsets = [
+            rawUVCoords.x,
+            rawUVCoords.y,
+            rawUVCoords.x,
+            rawUVCoords.y,
+            rawUVCoords.x,
+            rawUVCoords.y,
+            rawUVCoords.x,
+            rawUVCoords.y,
+        ];
 
         return {
             vertices: vertices,
             normals: normals,
             uvs: uvs,
-            blockType: actualBlockType,
+            atlasOffsets: atlasOffsets,
+            blockType: blockType,
         };
     }
 
@@ -426,7 +480,7 @@ class MeshWorker {
 
         for (const rect of rectangles) {
             const blockType = rect.blockType;
-            if (!blockType || !this.blockTable[blockType]) {
+            if (!blockType || !this.blocksByName.has(blockType)) {
                 continue;
             }
 
@@ -443,6 +497,7 @@ class MeshWorker {
             const normals = [];
             const uvs = [];
             const indices = [];
+            const atlasOffsets = [];
             let vertexOffset = 0;
 
             for (const rect of rects) {
@@ -452,7 +507,9 @@ class MeshWorker {
                     !rect.normals ||
                     rect.normals.length !== 12 ||
                     !rect.uvs ||
-                    rect.uvs.length !== 8
+                    rect.uvs.length !== 8 ||
+                    !rect.atlasOffsets ||
+                    rect.atlasOffsets.length !== 8
                 ) {
                     continue;
                 }
@@ -460,7 +517,7 @@ class MeshWorker {
                 positions.push(...rect.vertices);
                 normals.push(...rect.normals);
                 uvs.push(...rect.uvs);
-
+                atlasOffsets.push(...rect.atlasOffsets);
                 indices.push(
                     vertexOffset,
                     vertexOffset + 1,
@@ -478,6 +535,7 @@ class MeshWorker {
                 positions: positions,
                 normals: normals,
                 uvs: uvs,
+                atlasOffsets: atlasOffsets,
                 indices: indices,
             };
         }
@@ -550,7 +608,11 @@ self.onmessage = function (e) {
     try {
         switch (type) {
             case "initialize":
-                meshWorker.initialize(data.blockTable, data.transparentBlocks);
+                meshWorker.initialize(
+                    data.blocks,
+                    data.transparentBlocks,
+                    data.atlasSize
+                );
                 self.postMessage({ type: "initialized", success: true });
                 break;
 

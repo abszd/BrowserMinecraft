@@ -15,7 +15,8 @@ export class Chunk {
 
         this.isGenerating = false;
         this.isGenerated = false;
-        this.isBuildingMesh = false;
+        this.isBuildingMesh = false; // Add this flag
+        this.isFullyLoaded = false; // Add this flag
         this.isDirty = false;
     }
 
@@ -32,6 +33,7 @@ export class Chunk {
         this.grid = new Map(workerData.grid);
         this.lastAccessed = workerData.lastAccessed;
         this.isDirty = true;
+        this.isFullyLoaded = false; // Reset when chunk is updated
     }
 
     onMeshCompleted(terrainMeshData, waterMeshData) {
@@ -50,13 +52,12 @@ export class Chunk {
             )) {
                 if (meshData.positions.length === 0) continue;
 
-                let material;
-                if (blockType === "grass_top") {
-                    material = this.mgr.blockTable.grass.texture.top;
-                } else if (blockType === "grass_bottom") {
-                    material = this.mgr.blockTable.dirt.texture.side;
-                } else {
-                    material = this.mgr.blockTable[blockType].texture.side;
+                let material = this.mgr.blockTable[blockType]?.material;
+                if (!material) {
+                    console.warn(
+                        `No material found for block type: ${blockType}`
+                    );
+                    continue;
                 }
 
                 const geometry = new BufferGeometry();
@@ -72,6 +73,12 @@ export class Chunk {
                     "uv",
                     new Float32BufferAttribute(meshData.uvs, 2)
                 );
+                if (meshData.atlasOffsets) {
+                    geometry.setAttribute(
+                        "atlasOffset",
+                        new Float32BufferAttribute(meshData.atlasOffsets, 2)
+                    );
+                }
                 geometry.setIndex(meshData.indices);
 
                 const mesh = new Mesh(geometry, material);
@@ -97,10 +104,22 @@ export class Chunk {
 
             const waterMesh = new Mesh(
                 waterGeometry,
-                this.mgr.blockTable.water.texture.side
+                this.mgr.blockTable.water?.material
             );
-            this.mesh.add(waterMesh);
+            if (waterMesh.material) {
+                this.mesh.add(waterMesh);
+            }
         }
+
+        console.log(`Chunk mesh created for ${this.chunkX},${this.chunkZ}:`, {
+            meshChildren: this.mesh.children.length,
+            hasTerrainMesh: !!(
+                terrainMeshData && Object.keys(terrainMeshData).length > 0
+            ),
+            hasWaterMesh: !!(
+                waterMeshData && waterMeshData.positions.length > 0
+            ),
+        });
 
         return this.mesh;
     }
@@ -175,6 +194,7 @@ export class Chunk {
         }
 
         this.mesh = null;
+        this.isFullyLoaded = false;
     }
 
     activate() {

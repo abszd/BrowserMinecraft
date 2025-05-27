@@ -1,11 +1,16 @@
+attribute vec2 atlasOffset;
+
 varying vec2 v_uv;
 varying vec3 v_normal;
 varying vec3 v_position;
 varying float v_fogDepth;
 varying vec3 v_worldPos;
 varying vec3 v_worldNormal;
+varying vec2 v_atlasOffset;
 
 uniform float time;
+uniform vec2 atlasSize;
+uniform vec2 tileSize;
 
 void main() {
     v_uv = uv;
@@ -28,6 +33,8 @@ void main() {
     newPosition.y += wave * .5;
     newPosition.x += wave * 1.;
     newPosition.z += wave * 1.333;
+    
+    v_atlasOffset = atlasOffset;
 
     v_fogDepth =  sqrt(v_position.z * v_position.z + v_position.x * v_position.x);
     gl_Position = projectionMatrix * modelViewMatrix * vec4(newPosition, 1.0);

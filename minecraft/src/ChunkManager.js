@@ -1,5 +1,6 @@
 import { Frustum, Group, Matrix4, Box3, Vector3 } from "three";
 import { Chunk } from "./Chunk.js";
+import { Block } from "./Block.js";
 
 class ChunkManager {
     constructor(params = {}) {
@@ -16,13 +17,10 @@ class ChunkManager {
             culledChunks: 0,
         };
 
-        this.TRANSPARENT_BLOCKS = new Set();
-        this.TRANSPARENT_BLOCKS.add(-1);
-        this.TRANSPARENT_BLOCKS.add(4);
-        this.TRANSPARENT_BLOCKS.add(5);
+        this.TRANSPARENT_BLOCKS = new Set([-1, 4, 5]);
 
         this.amplitude = params.amplitude || 64;
-        this.chunks = new Map(); // "chunkX,chunkZ" -> Chunk
+        this.chunks = new Map();
         this.activeChunks = new Set();
         this.dirtyChunks = new Set();
         this.blockTable = params.blockTable;
@@ -40,10 +38,10 @@ class ChunkManager {
             this.renderDistance * this.renderDistance * 4
         );
 
-        this.chunkWorker = null; // For terrain generation
-        this.meshWorker = null; // For mesh building
-        this.pendingGeneration = new Map(); // chunkId -> chunk (waiting for terrain)
-        this.pendingMeshes = new Map(); // chunkId -> chunk (waiting for mesh)
+        this.chunkWorker = null;
+        this.meshWorker = null;
+        this.pendingGeneration = new Map();
+        this.pendingMeshes = new Map();
 
         this.workersInitialized = false;
         this.initializeWorkers();
@@ -51,32 +49,10 @@ class ChunkManager {
 
     updateRenderDistances(distance) {
         const fade = Math.min(this.chunkSize, distance / 8);
-        Object.values(this.blockTable).forEach((block) => {
-            if (
-                block.texture.side &&
-                block.texture.side.uniforms &&
-                block.texture.side.uniforms.renderDistance
-            ) {
-                block.texture.side.uniforms.renderDistance.value = distance;
-                block.texture.side.uniforms.renderFade.value = fade;
-            }
-
-            if (
-                block.texture.top &&
-                block.texture.top.uniforms &&
-                block.texture.top.uniforms.renderDistance
-            ) {
-                block.texture.top.uniforms.renderDistance.value = distance;
-                block.texture.top.uniforms.renderFade.value = fade;
-            }
-
-            if (
-                block.texture.bottom &&
-                block.texture.bottom.uniforms &&
-                block.texture.bottom.uniforms.renderDistance
-            ) {
-                block.texture.bottom.uniforms.renderDistance.value = distance;
-                block.texture.bottom.uniforms.renderFade.value = fade;
+        Object.values(this.blockTable._materials).forEach((material) => {
+            if (material.uniforms && material.uniforms.renderDistance) {
+                material.uniforms.renderDistance.value = distance;
+                material.uniforms.renderFade.value = fade;
             }
         });
     }
@@ -124,21 +100,17 @@ class ChunkManager {
                 },
             });
         }
-
         if (this.meshWorker) {
-            const workerBlockTable = {};
-            Object.entries(this.blockTable).forEach(([key, value]) => {
-                workerBlockTable[key] = {
-                    guid: value.guid,
-                    name: value.name,
-                };
-            });
+            const blockData = JSON.parse(
+                JSON.stringify(Array.from(Block.blocks.entries()))
+            );
 
             this.meshWorker.postMessage({
                 type: "initialize",
                 data: {
-                    blockTable: workerBlockTable,
+                    blocks: blockData,
                     transparentBlocks: Array.from(this.TRANSPARENT_BLOCKS),
+                    atlasSize: Block.atlasSize,
                 },
             });
         }
@@ -198,6 +170,7 @@ class ChunkManager {
                 break;
         }
     }
+
     checkWorkersReady() {
         if (this.chunkWorker && this.meshWorker && !this.workersInitialized) {
             this.workersInitialized = true;
@@ -222,9 +195,7 @@ class ChunkManager {
         }
 
         this.pendingGeneration.delete(chunkId);
-
         chunk.setChunkData(chunkData);
-
         this.requestMesh(chunk, chunkData);
     }
 
@@ -234,12 +205,8 @@ class ChunkManager {
         }
 
         const chunkId = `${chunk.chunkX},${chunk.chunkZ}`;
-        // console.log(
-        //     `Requesting mesh ${chunkId}, pending: ${this.pendingMeshes.has(
-        //         chunkId
-        //     )}`
-        // );
         this.pendingMeshes.set(chunkId, chunk);
+        chunk.isBuildingMesh = true; // Add this flag
 
         this.meshWorker.postMessage({
             type: "buildMesh",
@@ -259,18 +226,21 @@ class ChunkManager {
     onMeshCompleted(data) {
         const { chunkId, terrainMeshData, waterMeshData } = data;
         const chunk = this.pendingMeshes.get(chunkId);
-        //console.log(this.pendingMeshes.size);
+
         if (!chunk) {
             console.warn("Received mesh for unknown chunk:", chunkId);
-            this.dirtyChunks.add(chunk);
-            return;
+            return; // Fix: Don't try to add null chunk to dirtyChunks
         }
 
         this.pendingMeshes.delete(chunkId);
+        chunk.isBuildingMesh = false;
+
         if (chunk.mesh) {
             this.chunkGroup.remove(chunk.mesh);
         }
+
         chunk.onMeshCompleted(terrainMeshData, waterMeshData);
+        chunk.isFullyLoaded = true; // Add this flag to indicate complete loading
         this.addChunkToScene(chunk);
     }
 
@@ -280,10 +250,10 @@ class ChunkManager {
         }
     }
 
+    // Fix: More reliable spawn area checking
     isSpawnAreaLoaded(playerX, playerZ) {
         const playerChunkX = Math.floor(playerX / this.chunkSize);
         const playerChunkZ = Math.floor(playerZ / this.chunkSize);
-
         const spawnRadius = Math.min(2, this.renderDistance);
 
         for (let dx = -spawnRadius; dx <= spawnRadius; dx++) {
@@ -292,18 +262,44 @@ class ChunkManager {
                 const chunkZ = playerChunkZ + dz;
                 const chunk = this.getChunk(chunkX, chunkZ, false);
 
-                if (!chunk || !chunk.isGenerated || !chunk.mesh) {
+                if (!chunk) {
+                    console.log("❌ No chunk at", chunkX, chunkZ);
+                    return false;
+                }
+
+                if (!chunk.isGenerated) {
+                    console.log("❌ Chunk not generated at", chunkX, chunkZ);
+                    return false;
+                }
+
+                if (chunk.isBuildingMesh) {
+                    console.log(
+                        "❌ Chunk still building mesh at",
+                        chunkX,
+                        chunkZ
+                    );
+                    return false;
+                }
+
+                if (!chunk.mesh) {
+                    console.log("❌ No mesh at", chunkX, chunkZ);
+                    return false;
+                }
+
+                // Additional check: make sure the mesh is actually in the scene
+                if (!this.chunkGroup.children.includes(chunk.mesh)) {
+                    console.log("❌ Mesh not in scene at", chunkX, chunkZ);
                     return false;
                 }
             }
         }
 
+        console.log("✅ All spawn chunks loaded!");
         return true;
     }
 
     onChunkUpdated(chunkData) {
         const chunk = this.chunks.get(chunkData.chunkId);
-        //console.log(chunk);
         if (chunk) {
             if (chunkData.waterBlocks) {
                 chunk.waterBlocks = chunkData.waterBlocks;
@@ -312,7 +308,6 @@ class ChunkManager {
 
             if (this.activeChunks.has(chunk)) {
                 this.dirtyChunks.add(chunk);
-                //this.requestMesh(chunk, chunkData);
             }
         }
     }
@@ -342,7 +337,6 @@ class ChunkManager {
         if (!chunk && autoLoad) {
             chunk = new Chunk(this, chunkX, chunkZ);
             this.chunks.set(key, chunk);
-
             this.requestChunkGeneration(chunk);
         }
 
@@ -366,7 +360,6 @@ class ChunkManager {
     requestChunkGeneration(chunk) {
         const chunkId = `${chunk.chunkX},${chunk.chunkZ}`;
         if (!this.chunkWorker || !this.workersInitialized) {
-            console.warn("Error With Chunk:", chunkId);
             return;
         }
 
@@ -547,9 +540,6 @@ class ChunkManager {
         if (chunk.mesh) {
             this.chunkGroup.remove(chunk.mesh);
         }
-
-        const chunkId = `${chunk.chunkX},${chunk.chunkZ}`;
-        //console.log(`Pending Mesh Deleted ${chunkId}`);
     }
 
     updateDirtyChunks() {

@@ -7,6 +7,7 @@ import {
     Vector3,
 } from "three";
 import { PointerLockControls } from "./PointerLockControls.js";
+import { Inventory } from "./Inventory.js";
 
 class Player {
     constructor(renderer, width, chunkManager) {
@@ -15,7 +16,7 @@ class Player {
         this.depth = 0.6;
 
         this.mgr = chunkManager;
-
+        this.inventory = new Inventory({});
         this.zoomfov = 10;
         this.fov = 80;
         this.camera = new PerspectiveCamera(
@@ -122,6 +123,9 @@ class Player {
                     } else {
                         this.movementState.sprint = !this.movementState.sprint;
                     }
+                    break;
+                case "KeyI":
+                    this.inventory.open = !this.inventory.open;
                     break;
             }
         });
@@ -241,95 +245,6 @@ class Player {
         );
     }
 
-    // getFloorHeight(x, z) {
-    //     const halfWidth = this.width / 2;
-    //     const halfDepth = this.depth / 2;
-    //     let maxFloorHeight = 0;
-
-    //     const checkPoints = [
-    //         [x - halfWidth, z - halfDepth], // back left
-    //         [x, z - halfDepth], // back center
-    //         [x + halfWidth, z - halfDepth], // back right
-    //         [x - halfWidth, z], // middle left
-    //         [x, z], // center
-    //         [x + halfWidth, z], // middle right
-    //         [x - halfWidth, z + halfDepth], // front left
-    //         [x, z + halfDepth], // front center
-    //         [x + halfWidth, z + halfDepth], // front right
-    //     ];
-
-    //     for (const [pointX, pointZ] of checkPoints) {
-    //         for (let y = Math.floor(this.camera.position.y - 1); y >= 0; y--) {
-    //             if (this.isBlockSolid(pointX, y, pointZ)) {
-    //                 maxFloorHeight = Math.max(maxFloorHeight, y + 1);
-    //                 break;
-    //             }
-    //         }
-    //     }
-
-    //     return maxFloorHeight;
-    // }
-
-    // checkDirectionalCollision(startPos, endPos, axis) {
-    //     const halfWidth = this.width / 2;
-    //     const halfDepth = this.depth / 2;
-    //     const startFeetY = startPos.y - this.eyeHeight;
-    //     const endFeetY = endPos.y - this.eyeHeight;
-
-    //     let minX, maxX, minY, maxY, minZ, maxZ;
-
-    //     if (axis === "y") {
-    //         minX = Math.floor(startPos.x - halfWidth);
-    //         maxX = Math.floor(startPos.x + halfWidth);
-    //         minY = Math.floor(Math.min(startFeetY, endFeetY));
-    //         maxY = Math.floor(
-    //             Math.max(startFeetY + this.height, endFeetY + this.height)
-    //         );
-    //         minZ = Math.floor(startPos.z - halfDepth);
-    //         maxZ = Math.floor(startPos.z + halfDepth);
-    //     } else if (axis === "x") {
-    //         const direction = Math.sign(endPos.x - startPos.x);
-    //         minX =
-    //             direction > 0
-    //                 ? Math.floor(startPos.x + halfWidth)
-    //                 : Math.floor(endPos.x - halfWidth);
-    //         maxX =
-    //             direction > 0
-    //                 ? Math.floor(endPos.x + halfWidth)
-    //                 : Math.floor(startPos.x - halfWidth);
-    //         minY = Math.floor(startFeetY);
-    //         maxY = Math.floor(startFeetY + this.height);
-    //         minZ = Math.floor(startPos.z - halfDepth);
-    //         maxZ = Math.floor(startPos.z + halfDepth);
-    //     } else {
-    //         const direction = Math.sign(endPos.z - startPos.z);
-    //         minX = Math.floor(startPos.x - halfWidth);
-    //         maxX = Math.floor(startPos.x + halfWidth);
-    //         minY = Math.floor(startFeetY);
-    //         maxY = Math.floor(startFeetY + this.height);
-    //         minZ =
-    //             direction > 0
-    //                 ? Math.floor(startPos.z + halfDepth)
-    //                 : Math.floor(endPos.z - halfDepth);
-    //         maxZ =
-    //             direction > 0
-    //                 ? Math.floor(endPos.z + halfDepth)
-    //                 : Math.floor(startPos.z - halfDepth);
-    //     }
-
-    //     for (let x = minX; x <= maxX; x++) {
-    //         for (let y = minY; y <= maxY; y++) {
-    //             for (let z = minZ; z <= maxZ; z++) {
-    //                 if (this.isBlockSolid(x, y, z)) {
-    //                     return true;
-    //                 }
-    //             }
-    //         }
-    //     }
-
-    //     return false;
-    // }
-
     drawSelectBox() {
         const size = 1.001;
         const boxGeometry = new BoxGeometry(size, size, size);
@@ -351,6 +266,11 @@ class Player {
         switch (this.mouseButton) {
             case 0:
                 if (currentTime - this.lastBreakTime >= this.breakInterval) {
+                    const blockid = this.mgr.getBlock(
+                        this.lookingAt.x - 0.5,
+                        this.lookingAt.y - 0.5,
+                        this.lookingAt.z - 0.5
+                    );
                     this.mgr.setBlock(
                         this.lookingAt.x - 0.5,
                         this.lookingAt.y - 0.5,
@@ -358,6 +278,7 @@ class Player {
                         null
                     );
                     this.lastBreakTime = currentTime;
+                    this.inventory.add(blockid);
                 }
                 break;
 

@@ -5,14 +5,21 @@ varying vec3 v_worldNormal;
 
 varying float v_fogDepth;
 varying vec3 v_worldPos;
+varying vec2 v_atlasOffset;
 
 uniform sampler2D colormap;
 uniform float time;
 uniform float renderDistance;
 uniform float renderFade;
+uniform vec2 atlasSize;
+uniform vec2 tileSize;
 
 void main() {
-    vec4 texColor = texture2D(colormap, v_uv);
+    vec2 tiledUV = fract(v_uv);
+    vec2 tileUV = tiledUV * (tileSize / atlasSize);
+    vec2 atlasUV = (v_atlasOffset / atlasSize) + tileUV;
+    
+    vec4 texColor = texture2D(colormap, atlasUV);
     
     float grey = dot(texColor.rgb, vec3(0.333));
     float colorNoise = sin(v_worldPos.x * 0.1 + time * 0.1) * cos(v_worldPos.z * 0.1) * 0.1;
