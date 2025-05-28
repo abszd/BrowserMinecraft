@@ -279,7 +279,7 @@ class ChunkManager {
                 const chunk = this.getChunk(chunkX, chunkZ, false);
 
                 if (!chunk || !chunk.isGenerated || !chunk.mesh) {
-                    console.log(dx);
+                    //console.log(dx);
                     return false;
                 }
             }

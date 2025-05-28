@@ -102,6 +102,7 @@ export class Chunk {
 
         return this.mesh;
     }
+
     getBlockMaterial(blockType, face) {
         const blockData = this.mgr.blockTable[blockType];
         if (!blockData) return null;

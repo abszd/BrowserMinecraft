@@ -4,7 +4,6 @@ class ChunkWorker {
         this.blockTable = null;
         this.worldSeed = 69420;
         this._globalPerm = null;
-        this.TRANSPARENT_BLOCKS = new Set([-1, 4, 5]); // Air, Water, Leaves
     }
 
     initialize(params) {
@@ -98,21 +97,62 @@ class WorkerChunk {
         this.waterBlocks = [];
         this.lastAccessed = Date.now();
         this.waterLevel = 10;
+        this.TRANSPARENT_BLOCKS = new Set([-1, 4, 5]);
     }
 
     generateTerrain() {
-        for (let localX = 0; localX < this.size; localX++) {
-            for (let localZ = 0; localZ < this.size; localZ++) {
+        const heightCache = new Map();
+
+        const stoneSlope = 3;
+        const dirtSlope = 2;
+
+        for (let localX = -1; localX <= this.size; localX++) {
+            for (let localZ = -1; localZ <= this.size; localZ++) {
                 const worldX = localX + this.chunkX * this.size;
                 const worldZ = localZ + this.chunkZ * this.size;
+                heightCache.set(
+                    `${localX},${localZ}`,
+                    this.generateHeightAt(worldX, worldZ)
+                );
+            }
+        }
 
-                const height = this.generateHeightAt(worldX, worldZ);
+        for (let localX = 0; localX < this.size; localX++) {
+            for (let localZ = 0; localZ < this.size; localZ++) {
+                const height = heightCache.get(`${localX},${localZ}`);
+
+                const heightR =
+                    heightCache.get(`${localX + 1},${localZ}`) || height;
+                const heightF =
+                    heightCache.get(`${localX},${localZ + 1}`) || height;
+                const heightL =
+                    heightCache.get(`${localX - 1},${localZ}`) || height;
+                const heightB =
+                    heightCache.get(`${localX},${localZ - 1}`) || height;
+                const gradientX = (heightR - heightL) / 2.0;
+                const gradientZ = (heightF - heightB) / 2.0;
+
+                const slope = Math.sqrt(
+                    gradientX * gradientX + gradientZ * gradientZ
+                );
 
                 for (let y = 0; y < height; y++) {
                     let blockType;
-                    if (y < height - 4) blockType = 1;
-                    else if (y < height - 1) blockType = 0;
-                    else blockType = 2;
+                    if (y < height - 4) {
+                        blockType = 1; // Stone (deep)
+                    } else if (y < height - 1) {
+                        if (slope > dirtSlope) {
+                            blockType = 1;
+                        } else {
+                            blockType = 0;
+                        }
+                    } else {
+                        if (slope > stoneSlope) {
+                            blockType = 1;
+                        } else {
+                            blockType = 2;
+                        }
+                    }
 
                     this.setBlock(localX, y, localZ, blockType);
                 }
@@ -160,10 +200,10 @@ class WorkerChunk {
 
         total /= maxAmplitude;
         let height = ((total + 1) * amplitude) / 2;
-        height = Math.pow(height / amplitude, 1.2) * amplitude;
+        height = Math.pow(height / amplitude, 1.5) * amplitude;
         height = amplitude / (1 + Math.exp(-10 * (height / amplitude - 0.5)));
 
-        return Math.floor(Math.max(0, Math.min(amplitude, height))) + 4;
+        return Math.floor(Math.max(0, Math.min(amplitude, height))) + 8;
     }
 
     perlin2d(x, z) {
@@ -214,7 +254,6 @@ class WorkerChunk {
 
         const x1 = lerp(g1, g2, u);
         const x2 = lerp(g3, g4, u);
-
         return lerp(x1, x2, v);
     }
 
@@ -309,7 +348,10 @@ class WorkerChunk {
             this.grid.delete(key);
         } else {
             this.grid.set(key, blockType);
-            if (this.grid.get(`${x} ${y - 1} ${z}`) === 2) {
+            if (
+                this.grid.get(`${x} ${y - 1} ${z}`) === 2 &&
+                !this.TRANSPARENT_BLOCKS.has(blockType)
+            ) {
                 this.grid.set(`${x} ${y - 1} ${z}`, 0);
             }
         }

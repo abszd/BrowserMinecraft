@@ -1,6 +1,5 @@
 import { ChunkManager } from "./ChunkManager.js";
 import { getBlockTable } from "./BlockTable.js";
-
 import {
     TextureLoader,
     EquirectangularReflectionMapping,
@@ -11,7 +10,6 @@ import {
     NearestMipmapLinearFilter,
     RepeatWrapping,
     LoadingManager,
-    LinearMipMapNearestFilter,
 } from "three";
 import { Player } from "./Player.js";
 import { Debug } from "./Debug.js";
@@ -86,7 +84,7 @@ const chunkManager = new ChunkManager({
     chunkHeight: 128,
     renderDistance: renderDistance,
     blockTable: blockTable,
-    amplitude: 32,
+    amplitude: 48,
 });
 const debug = new Debug(chunkManager);
 
