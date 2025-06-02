@@ -96,7 +96,7 @@ class WorkerChunk {
         this.grid = new Map();
         this.waterBlocks = [];
         this.lastAccessed = Date.now();
-        this.waterLevel = 10;
+        this.waterLevel = 6;
         this.TRANSPARENT_BLOCKS = new Set([-1, 4, 5]);
     }
 
@@ -110,10 +110,7 @@ class WorkerChunk {
             for (let localZ = -1; localZ <= this.size; localZ++) {
                 const worldX = localX + this.chunkX * this.size;
                 const worldZ = localZ + this.chunkZ * this.size;
-                heightCache.set(
-                    `${localX},${localZ}`,
-                    this.generateHeightAt(worldX, worldZ)
-                );
+                heightCache.set(`${localX},${localZ}`, this.generateHeightAt(worldX, worldZ));
             }
         }
 
@@ -121,20 +118,14 @@ class WorkerChunk {
             for (let localZ = 0; localZ < this.size; localZ++) {
                 const height = heightCache.get(`${localX},${localZ}`);
 
-                const heightR =
-                    heightCache.get(`${localX + 1},${localZ}`) || height;
-                const heightF =
-                    heightCache.get(`${localX},${localZ + 1}`) || height;
-                const heightL =
-                    heightCache.get(`${localX - 1},${localZ}`) || height;
-                const heightB =
-                    heightCache.get(`${localX},${localZ - 1}`) || height;
+                const heightR = heightCache.get(`${localX + 1},${localZ}`) || height;
+                const heightF = heightCache.get(`${localX},${localZ + 1}`) || height;
+                const heightL = heightCache.get(`${localX - 1},${localZ}`) || height;
+                const heightB = heightCache.get(`${localX},${localZ - 1}`) || height;
                 const gradientX = (heightR - heightL) / 2.0;
                 const gradientZ = (heightF - heightB) / 2.0;
 
-                const slope = Math.sqrt(
-                    gradientX * gradientX + gradientZ * gradientZ
-                );
+                const slope = Math.sqrt(gradientX * gradientX + gradientZ * gradientZ);
 
                 for (let y = 0; y < height; y++) {
                     let blockType;
@@ -163,7 +154,7 @@ class WorkerChunk {
     generateHeightAt(worldX, worldZ) {
         const amplitude = this.worker.amplitude || 32;
         const octaves = 3;
-        const baseFrequency = 0.005;
+        const baseFrequency = 0.002;
 
         let total = 0;
         let frequency = baseFrequency;
@@ -182,7 +173,6 @@ class WorkerChunk {
             frequency *= 2;
             currentAmplitude *= amplitudeChange;
         }
-
         frequency = 0.02;
         currentAmplitude = 1;
         maxAmplitude = 0;
@@ -203,14 +193,12 @@ class WorkerChunk {
         height = Math.pow(height / amplitude, 1.5) * amplitude;
         height = amplitude / (1 + Math.exp(-10 * (height / amplitude - 0.5)));
 
-        return Math.floor(Math.max(0, Math.min(amplitude, height))) + 8;
+        return Math.floor(Math.max(0, Math.min(amplitude, height))) + 5;
     }
 
     perlin2d(x, z) {
         if (!this.worker._globalPerm) {
-            this.worker._globalPerm = this.worker.generatePermTable(
-                this.worker.worldSeed
-            );
+            this.worker._globalPerm = this.worker.generatePermTable(this.worker.worldSeed);
         }
         this._perm = this.worker._globalPerm;
 
@@ -320,17 +308,25 @@ class WorkerChunk {
 
         for (let x = 0; x < this.size; x++) {
             for (let z = 0; z < this.size; z++) {
+                let foundSolid = false;
+                let waterStart = -1;
+
                 for (let y = 0; y < this.height; y++) {
                     const blockId = this.getBlock(x, y, z);
 
                     if (blockId === 5) {
                         const blockAbove = this.getBlock(x, y + 1, z);
                         const isTopWater = blockAbove !== 5;
-
                         this.waterBlocks.push({ x, y, z, isTopWater });
+                        continue;
                     }
 
-                    if (y >= 3 && y <= this.waterLevel && blockId === -1) {
+                    if (y > this.waterLevel || blockId !== -1) {
+                        foundSolid = blockId !== -1;
+                        continue;
+                    }
+
+                    if (y >= 3) {
                         this.setBlock(x, y, z, 5);
                         const isTopWater = y === this.waterLevel;
                         this.waterBlocks.push({ x, y, z, isTopWater });
@@ -348,10 +344,7 @@ class WorkerChunk {
             this.grid.delete(key);
         } else {
             this.grid.set(key, blockType);
-            if (
-                this.grid.get(`${x} ${y - 1} ${z}`) === 2 &&
-                !this.TRANSPARENT_BLOCKS.has(blockType)
-            ) {
+            if (this.grid.get(`${x} ${y - 1} ${z}`) === 2 && !this.TRANSPARENT_BLOCKS.has(blockType)) {
                 this.grid.set(`${x} ${y - 1} ${z}`, 0);
             }
         }
@@ -383,10 +376,7 @@ class WorkerChunk {
             if (y === -1) continue;
 
             const blockId = this.getBlock(x, y, z);
-            if (
-                blockId !== -1 &&
-                !this.worker.TRANSPARENT_BLOCKS.has(blockId)
-            ) {
+            if (blockId !== -1 && !this.worker.TRANSPARENT_BLOCKS.has(blockId)) {
                 let hasSpace = true;
                 for (let j = 1; j <= objHeight; j++) {
                     if (this.getBlock(x, y + j, z) !== -1) {
@@ -396,38 +386,19 @@ class WorkerChunk {
                 }
 
                 if (hasSpace) {
-                    return [
-                        x + this.chunkX * this.size + 0.5,
-                        y + objHeight / 2,
-                        z + this.chunkZ * this.size + 0.5,
-                    ];
+                    return [x + this.chunkX * this.size + 0.5, y + objHeight / 2, z + this.chunkZ * this.size + 0.5];
                 }
             }
         }
 
-        return [
-            this.chunkX * this.size + this.size / 2,
-            this.height / 2,
-            this.chunkZ * this.size + this.size / 2,
-        ];
+        return [this.chunkX * this.size + this.size / 2, this.height / 2, this.chunkZ * this.size + this.size / 2];
     }
 }
 
 const chunkWorker = new ChunkWorker();
 
 self.onmessage = function (e) {
-    const {
-        type,
-        chunkX,
-        chunkZ,
-        params,
-        chunkId,
-        x,
-        y,
-        z,
-        blockType,
-        objHeight,
-    } = e.data;
+    const { type, chunkX, chunkZ, params, chunkId, x, y, z, blockType, objHeight } = e.data;
 
     try {
         switch (type) {
@@ -448,14 +419,7 @@ self.onmessage = function (e) {
                 break;
 
             case "updateBlock":
-                const updatedData = chunkWorker.updateBlock(
-                    chunkId,
-                    x,
-                    y,
-                    z,
-                    blockType,
-                    e.data.updateWaterMesh
-                );
+                const updatedData = chunkWorker.updateBlock(chunkId, x, y, z, blockType, e.data.updateWaterMesh);
                 if (updatedData) {
                     self.postMessage({
                         type: "chunkUpdated",
@@ -474,10 +438,7 @@ self.onmessage = function (e) {
                 break;
 
             case "findSpawn":
-                const spawnLocation = chunkWorker.findSpawnLocation(
-                    chunkId,
-                    objHeight
-                );
+                const spawnLocation = chunkWorker.findSpawnLocation(chunkId, objHeight);
                 self.postMessage({
                     type: "spawnFound",
                     chunkId: chunkId,

@@ -42,51 +42,21 @@ class MeshWorker {
                     const blockId = this.getBlock(chunkGrid, x, y, z);
 
                     if (blockId !== -1 && blockId !== 5) {
-                        let neighbor =
-                            x === size - 1
-                                ? -1
-                                : this.getBlock(chunkGrid, x + 1, y, z);
-                        if (
-                            this.TRANSPARENT_BLOCKS.has(neighbor) &&
-                            blockId !== neighbor
-                        ) {
+                        let neighbor = x === size - 1 ? -1 : this.getBlock(chunkGrid, x + 1, y, z);
+                        if (this.TRANSPARENT_BLOCKS.has(neighbor) && blockId !== neighbor) {
                             maskE[y][z] = blockId;
                         }
 
-                        neighbor =
-                            x === 0
-                                ? -1
-                                : this.getBlock(chunkGrid, x - 1, y, z);
-                        if (
-                            this.TRANSPARENT_BLOCKS.has(neighbor) &&
-                            blockId !== neighbor
-                        ) {
+                        neighbor = x === 0 ? -1 : this.getBlock(chunkGrid, x - 1, y, z);
+                        if (this.TRANSPARENT_BLOCKS.has(neighbor) && blockId !== neighbor) {
                             maskW[y][z] = blockId;
                         }
                     }
                 }
             }
 
-            rects.push(
-                ...this.getGreedySlice(
-                    maskE,
-                    0,
-                    x,
-                    0,
-                    worldOffsetX,
-                    worldOffsetZ
-                )
-            );
-            rects.push(
-                ...this.getGreedySlice(
-                    maskW,
-                    0,
-                    x,
-                    1,
-                    worldOffsetX,
-                    worldOffsetZ
-                )
-            );
+            rects.push(...this.getGreedySlice(maskE, 0, x, 0, worldOffsetX, worldOffsetZ));
+            rects.push(...this.getGreedySlice(maskW, 0, x, 1, worldOffsetX, worldOffsetZ));
         }
 
         // Z-AXIS faces
@@ -103,51 +73,21 @@ class MeshWorker {
                     const blockId = this.getBlock(chunkGrid, x, y, z);
 
                     if (blockId !== -1 && blockId !== 5) {
-                        let neighbor =
-                            z === size - 1
-                                ? -1
-                                : this.getBlock(chunkGrid, x, y, z + 1);
-                        if (
-                            this.TRANSPARENT_BLOCKS.has(neighbor) &&
-                            blockId !== neighbor
-                        ) {
+                        let neighbor = z === size - 1 ? -1 : this.getBlock(chunkGrid, x, y, z + 1);
+                        if (this.TRANSPARENT_BLOCKS.has(neighbor) && blockId !== neighbor) {
                             maskN[y][x] = blockId;
                         }
 
-                        neighbor =
-                            z === 0
-                                ? -1
-                                : this.getBlock(chunkGrid, x, y, z - 1);
-                        if (
-                            this.TRANSPARENT_BLOCKS.has(neighbor) &&
-                            blockId !== neighbor
-                        ) {
+                        neighbor = z === 0 ? -1 : this.getBlock(chunkGrid, x, y, z - 1);
+                        if (this.TRANSPARENT_BLOCKS.has(neighbor) && blockId !== neighbor) {
                             maskS[y][x] = blockId;
                         }
                     }
                 }
             }
 
-            rects.push(
-                ...this.getGreedySlice(
-                    maskN,
-                    2,
-                    z,
-                    0,
-                    worldOffsetX,
-                    worldOffsetZ
-                )
-            );
-            rects.push(
-                ...this.getGreedySlice(
-                    maskS,
-                    2,
-                    z,
-                    1,
-                    worldOffsetX,
-                    worldOffsetZ
-                )
-            );
+            rects.push(...this.getGreedySlice(maskN, 2, z, 0, worldOffsetX, worldOffsetZ));
+            rects.push(...this.getGreedySlice(maskS, 2, z, 1, worldOffsetX, worldOffsetZ));
         }
 
         // Y-AXIS faces
@@ -164,55 +104,21 @@ class MeshWorker {
                     const blockId = this.getBlock(chunkGrid, x, y, z);
 
                     if (blockId !== -1 && blockId !== 5) {
-                        const upperNeighbor = this.getBlock(
-                            chunkGrid,
-                            x,
-                            y + 1,
-                            z
-                        );
-                        if (
-                            this.TRANSPARENT_BLOCKS.has(upperNeighbor) &&
-                            blockId !== upperNeighbor
-                        ) {
+                        const upperNeighbor = this.getBlock(chunkGrid, x, y + 1, z);
+                        if (this.TRANSPARENT_BLOCKS.has(upperNeighbor) && blockId !== upperNeighbor) {
                             maskU[x][z] = blockId;
                         }
 
-                        const lowerNeighbor = this.getBlock(
-                            chunkGrid,
-                            x,
-                            y - 1,
-                            z
-                        );
-                        if (
-                            this.TRANSPARENT_BLOCKS.has(lowerNeighbor) &&
-                            blockId !== lowerNeighbor
-                        ) {
+                        const lowerNeighbor = this.getBlock(chunkGrid, x, y - 1, z);
+                        if (this.TRANSPARENT_BLOCKS.has(lowerNeighbor) && blockId !== lowerNeighbor) {
                             maskD[x][z] = blockId;
                         }
                     }
                 }
             }
 
-            rects.push(
-                ...this.getGreedySlice(
-                    maskU,
-                    1,
-                    y,
-                    0,
-                    worldOffsetX,
-                    worldOffsetZ
-                )
-            );
-            rects.push(
-                ...this.getGreedySlice(
-                    maskD,
-                    1,
-                    y,
-                    1,
-                    worldOffsetX,
-                    worldOffsetZ
-                )
-            );
+            rects.push(...this.getGreedySlice(maskU, 1, y, 0, worldOffsetX, worldOffsetZ));
+            rects.push(...this.getGreedySlice(maskD, 1, y, 1, worldOffsetX, worldOffsetZ));
         }
 
         return this.makeGreedyMeshData(rects);
@@ -250,37 +156,13 @@ class MeshWorker {
                     }
                 }
 
-                rectangles.push(
-                    this.createRect(
-                        slice,
-                        rx1,
-                        rx2,
-                        ry1,
-                        ry2,
-                        axis,
-                        pos,
-                        dir,
-                        worldOffsetX,
-                        worldOffsetZ
-                    )
-                );
+                rectangles.push(this.createRect(slice, rx1, rx2, ry1, ry2, axis, pos, dir, worldOffsetX, worldOffsetZ));
             }
         }
         return rectangles;
     }
 
-    createRect(
-        slice,
-        x1,
-        x2,
-        y1,
-        y2,
-        axis,
-        pos,
-        dir,
-        worldOffsetX = 0,
-        worldOffsetZ = 0
-    ) {
+    createRect(slice, x1, x2, y1, y2, axis, pos, dir, worldOffsetX = 0, worldOffsetZ = 0) {
         const blockType = this.idBlockTypeLookup[slice[y1][x1]];
         let vertices, normal, uvs;
         const width = x2 - x1;
@@ -563,12 +445,7 @@ self.onmessage = function (e) {
 
                 const waterMeshData =
                     waterBlocks && waterBlocks.length > 0
-                        ? meshWorker.buildWaterMesh(
-                              waterBlocks,
-                              chunkData.chunkX,
-                              chunkData.chunkZ,
-                              chunkData.size
-                          )
+                        ? meshWorker.buildWaterMesh(waterBlocks, chunkData.chunkX, chunkData.chunkZ, chunkData.size)
                         : null;
 
                 self.postMessage({

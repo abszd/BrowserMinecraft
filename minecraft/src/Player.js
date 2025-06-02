@@ -56,8 +56,8 @@ class Player {
         this.gravity = 24.0;
         this.stepHeight = 1.333;
         this.eyeHeight = 1.6;
-        this.jumpCooldown = 0.3;
-        this.jumpTimer = 0;
+        this.jumpCooldown = 0.1;
+        this.jumpTimer = -1;
         this.swimForce = 3;
         this.flying = false;
         this.lookingAt = null;
@@ -82,6 +82,8 @@ class Player {
         document.addEventListener("mousedown", (event) => {
             this.mouseDown = true;
             this.mouseButton = event.button;
+            this.inventory.mouseDown = true;
+            this.inventory.mouseButton = event.button;
         });
 
         document.addEventListener("mouseup", (event) => {
@@ -590,18 +592,34 @@ class Player {
 
         const camera = this.camera;
         const currentPos = camera.position.clone();
-
+        const inWater = this.inWater();
+        this.jumpTimer -= delta;
         if (!this.flying) {
             this.isGrounded = this.isOnGround(currentPos);
 
-            if (this.movementState.jump && this.isGrounded) {
-                this.velocity.y = this.jumpForce;
-            }
-
             if (!this.isGrounded) {
                 this.velocity.y -= this.gravity * delta;
+
+                if (inWater) {
+                    this.velocity.y = Math.max(this.velocity.y, -2);
+                }
             } else if (this.velocity.y < 0) {
                 this.velocity.y = 0;
+            }
+
+            if (this.movementState.jump && this.jumpTimer < 0) {
+                if (
+                    this.mgr.getBlock(
+                        Math.floor(camera.position.x),
+                        Math.floor(camera.position.y - 0.6),
+                        Math.floor(camera.position.z)
+                    ) === 5
+                ) {
+                    this.velocity.y = this.swimForce;
+                } else if (this.isGrounded) {
+                    this.velocity.y = this.jumpForce;
+                }
+                this.jumpTimer = this.jumpCooldown;
             }
         } else {
             let moveY = 0;
@@ -626,6 +644,18 @@ class Player {
                 const forwardVector = new Vector3();
                 this.controls.getDirection(forwardVector);
                 forwardVector.y = 0;
+                if (Math.abs(forwardVector.length()) < 0.01) {
+                    const sideVector = new Vector3(
+                        camera.matrix.elements[0],
+                        0,
+                        camera.matrix.elements[2]
+                    );
+                    sideVector.normalize();
+                    forwardVector.crossVectors(
+                        sideVector,
+                        new Vector3(0, -1, 0)
+                    );
+                }
                 forwardVector.normalize();
                 moveVector.add(forwardVector.multiplyScalar(moveZ));
             }
@@ -648,11 +678,12 @@ class Player {
                     : this.movementState.sprint
                     ? 1.5
                     : 1) *
-                (this.inWater() ? 0.5 : 1.0);
+                (inWater ? 0.5 : 1.0);
 
             moveVector.multiplyScalar(speed * delta);
             //console.log(this.velocity.y);
         }
+
         moveVector.y += this.velocity.y * delta;
         targetPos.add(moveVector);
         const finalPos = this.resolveCollision(currentPos, targetPos, delta);

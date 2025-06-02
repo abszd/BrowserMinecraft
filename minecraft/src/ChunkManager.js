@@ -32,10 +32,7 @@ class ChunkManager {
         this.chunkGroup = new Group();
         this.scene.add(this.chunkGroup);
 
-        this.maxLoadedChunks = Math.max(
-            1024,
-            this.renderDistance * this.renderDistance * 4
-        );
+        this.maxLoadedChunks = Math.max(1024, this.renderDistance * this.renderDistance * 4);
 
         this.chunkWorker = null; // For terrain generation
         this.meshWorker = null; // For mesh building
@@ -66,19 +63,14 @@ class ChunkManager {
 
     initializeWorkers() {
         try {
-            this.chunkWorker = new Worker(
-                new URL("./chunkWorker.js", import.meta.url)
-            );
-            this.chunkWorker.onmessage = (e) =>
-                this.handleChunkWorkerMessage(e);
+            this.chunkWorker = new Worker(new URL("./chunkWorker.js", import.meta.url));
+            this.chunkWorker.onmessage = (e) => this.handleChunkWorkerMessage(e);
             this.chunkWorker.onerror = (error) => {
                 console.error("Chunk worker error:", error);
                 this.chunkWorker = null;
             };
 
-            this.meshWorker = new Worker(
-                new URL("./meshWorker.js", import.meta.url)
-            );
+            this.meshWorker = new Worker(new URL("./meshWorker.js", import.meta.url));
             this.meshWorker.onmessage = (e) => this.handleMeshWorkerMessage(e);
             this.meshWorker.onerror = (error) => {
                 console.error("Mesh worker error:", error);
@@ -342,11 +334,7 @@ class ChunkManager {
 
         return new Box3(
             new Vector3(worldX, 0, worldZ),
-            new Vector3(
-                worldX + this.chunkSize,
-                this.chunkHeight,
-                worldZ + this.chunkSize
-            )
+            new Vector3(worldX + this.chunkSize, this.chunkHeight, worldZ + this.chunkSize)
         );
     }
 
@@ -368,15 +356,13 @@ class ChunkManager {
     }
 
     getBlock(x, y, z) {
-        const { chunkX, chunkZ, localX, localY, localZ } =
-            this.worldToChunkCoords(x, y, z);
+        const { chunkX, chunkZ, localX, localY, localZ } = this.worldToChunkCoords(x, y, z);
         const chunk = this.getChunk(chunkX, chunkZ, false);
         return chunk ? chunk.getBlock(localX, localY, localZ) : -1;
     }
 
     setBlock(x, y, z, blockType) {
-        const { chunkX, chunkZ, localX, localY, localZ } =
-            this.worldToChunkCoords(x, y, z);
+        const { chunkX, chunkZ, localX, localY, localZ } = this.worldToChunkCoords(x, y, z);
         const chunk = this.getChunk(chunkX, chunkZ, true);
         const chunkId = `${chunkX},${chunkZ}`;
 
@@ -397,8 +383,7 @@ class ChunkManager {
         const adjacentChunks = new Set();
         for (const [adjX, adjY, adjZ] of adjacentPositions) {
             if (this.getBlock(adjX, adjY, adjZ) === waterGuid) {
-                const { chunkX: adjChunkX, chunkZ: adjChunkZ } =
-                    this.worldToChunkCoords(adjX, adjY, adjZ);
+                const { chunkX: adjChunkX, chunkZ: adjChunkZ } = this.worldToChunkCoords(adjX, adjY, adjZ);
                 const adjChunk = this.getChunk(adjChunkX, adjChunkZ, false);
                 if (adjChunk) {
                     adjacentChunks.add(adjChunk);
@@ -439,18 +424,27 @@ class ChunkManager {
         }
     }
 
-    findSpawnLocation(objHeight = 2) {
-        let chunk = this.getChunk(0, 0, true);
+    findSpawnLocation(x = 0, z = 0, objHeight = 2) {
+        if (Math.abs(x) > 4 || Math.abs(z) > 4) return null;
 
-        if (!chunk.isGenerated) {
-            return [
-                this.chunkSize / 2,
-                this.chunkHeight / 2,
-                this.chunkSize / 2,
-            ];
+        let chunk = this.getChunk(x, z, true);
+        if (!chunk.isGenerated) return null;
+
+        let spawn = chunk.findSpawnLocation(objHeight);
+        if (spawn) return spawn;
+
+        const offsets = [
+            [1, 0],
+            [0, 1],
+            [-1, 0],
+            [0, -1],
+        ];
+        for (const [dx, dz] of offsets) {
+            spawn = this.findSpawnLocation(x + dx, z + dz, objHeight);
+            if (spawn) return spawn;
         }
 
-        return chunk.findSpawnLocation(objHeight) || [0, this.chunkHeight, 0];
+        return null;
     }
 
     performFrustumCulling() {
@@ -482,11 +476,7 @@ class ChunkManager {
         const maxDistSq = this.renderDistance * this.renderDistance;
 
         for (let dx = -this.renderDistance; dx <= this.renderDistance; dx++) {
-            for (
-                let dz = -this.renderDistance;
-                dz <= this.renderDistance;
-                dz++
-            ) {
+            for (let dz = -this.renderDistance; dz <= this.renderDistance; dz++) {
                 if (dx * dx + dz * dz > maxDistSq) continue;
 
                 const chunkX = playerChunkX + dx;
@@ -511,10 +501,7 @@ class ChunkManager {
         this.enforceChunkLimit();
         this.updateDirtyChunks();
         if (this.camera) {
-            this.cameraMatrix.multiplyMatrices(
-                this.camera.projectionMatrix,
-                this.camera.matrixWorldInverse
-            );
+            this.cameraMatrix.multiplyMatrices(this.camera.projectionMatrix, this.camera.matrixWorldInverse);
             this.frustum.setFromProjectionMatrix(this.cameraMatrix);
             this.performFrustumCulling();
         }
@@ -561,18 +548,10 @@ class ChunkManager {
 
         const chunksArray = Array.from(this.chunks.values());
         const sortedChunks = chunksArray
-            .filter(
-                (c) =>
-                    !this.activeChunks.has(c) &&
-                    !c.isGenerating &&
-                    !c.isBuildingMesh
-            )
+            .filter((c) => !this.activeChunks.has(c) && !c.isGenerating && !c.isBuildingMesh)
             .sort((a, b) => a.lastAccessed - b.lastAccessed);
 
-        const toRemove = sortedChunks.slice(
-            0,
-            this.chunks.size - this.maxLoadedChunks
-        );
+        const toRemove = sortedChunks.slice(0, this.chunks.size - this.maxLoadedChunks);
 
         for (const chunk of toRemove) {
             this.unloadChunk(chunk);

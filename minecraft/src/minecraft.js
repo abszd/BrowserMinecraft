@@ -84,7 +84,7 @@ const chunkManager = new ChunkManager({
     chunkHeight: 128,
     renderDistance: renderDistance,
     blockTable: blockTable,
-    amplitude: 48,
+    amplitude: 24,
 });
 const debug = new Debug(chunkManager);
 

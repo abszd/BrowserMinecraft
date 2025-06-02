@@ -160,11 +160,7 @@ export class Chunk {
             }
         }
 
-        return [
-            this.chunkX * this.size + this.size / 2,
-            this.height / 2,
-            this.chunkZ * this.size + this.size / 2,
-        ];
+        return null;
     }
 
     disposeCurrentMesh() {
