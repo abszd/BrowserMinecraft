@@ -13,11 +13,17 @@ import {
 } from "three";
 import { Player } from "./Player.js";
 import { Debug } from "./Debug.js";
+import Stats from "stats.js";
+const stats = new Stats();
+stats.showPanel(1);
+//stats.dom.style.cssText = "position:absolute;bottom:10px;right:10px;";
 
+document.body.appendChild(stats.dom);
 const renderer = new WebGLRenderer({
     antialias: true,
     powerPreference: "high-performance",
 });
+
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(window.devicePixelRatio);
 renderer.domElement.style.position = "absolute";
@@ -46,7 +52,7 @@ document.body.appendChild(renderer.domElement);
 const scene = new Scene();
 
 const chunkSize = 16;
-const renderDistance = 10;
+const renderDistance = 4;
 const renderFade = Math.min(renderDistance / 8, 1);
 const worldSeed = 173869420;
 
@@ -84,7 +90,8 @@ const chunkManager = new ChunkManager({
     chunkHeight: 128,
     renderDistance: renderDistance,
     blockTable: blockTable,
-    amplitude: 24,
+    amplitude: 64,
+    //seed: worldSeed,
 });
 const debug = new Debug(chunkManager);
 
@@ -106,11 +113,7 @@ let introCompleted = false;
 let now = 0;
 let resourcesLoaded = false;
 
-const player = new Player(
-    renderer,
-    chunkSize * renderDistance * 2,
-    chunkManager
-);
+const player = new Player(renderer, chunkSize * renderDistance * 2, chunkManager);
 chunkManager.camera = player.camera;
 loadingManager.onLoad = function () {
     resourcesLoaded = true;
@@ -139,9 +142,10 @@ document.body.appendChild(loadingScreen);
 let iter = -1;
 let fps = 0;
 let last = 0;
-const fpsUpdate = 5;
+const fpsUpdate = 20;
 function animate() {
     requestAnimationFrame(animate);
+    stats.begin();
     const delta = clock.getDelta();
     now += delta;
 
@@ -173,19 +177,18 @@ function animate() {
     if (iter++ % fpsUpdate === 0) {
         last = Math.round(fpsUpdate / fps);
         fps = 0;
+        debug.update(last, player, chunkManager);
+        //console.log(renderer.info);
     }
     fps += delta;
-    debug.update(last, player, chunkManager);
 
     blockTable.leaf.texture.side.uniforms.time.value += delta * 0.5;
     blockTable.water.texture.side.uniforms.time.value += delta * 0.5;
 
-    chunkManager.updateChunks(
-        player.camera.position.x,
-        player.camera.position.z
-    );
+    chunkManager.updateChunks(player.camera.position.x, player.camera.position.z);
 
     renderer.render(scene, player.camera);
+    stats.end();
 }
 
 function onWindowResize() {
@@ -205,11 +208,7 @@ async function waitForSpawnChunks() {
         await new Promise((resolve) => setTimeout(resolve, 100));
     }
     const spawnLocation = chunkManager.findSpawnLocation(2);
-    player.camera.position.set(
-        spawnLocation[0],
-        spawnLocation[1] + 2,
-        spawnLocation[2]
-    );
+    player.camera.position.set(spawnLocation[0], spawnLocation[1] + 2, spawnLocation[2]);
     //console.log("Spawn chunks loaded! Starting game...");
 }
 

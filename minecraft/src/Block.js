@@ -43,84 +43,64 @@ export class Block {
     }
 
     static createSharedMaterials(rd, rf) {
-        Block._sharedMaterials.standard = shaderMaterial(
-            "shader.vs",
-            "shader.fs",
-            {
-                side: FrontSide,
-                uniforms: {
-                    colormap: { value: Block.loadTexture("textures/dirt.png") }, // Default texture
-                    renderDistance: { value: rd },
-                    renderFade: { value: rf },
-                },
-            }
-        );
+        Block._sharedMaterials.standard = shaderMaterial("shader.vs", "shader.fs", {
+            side: FrontSide,
+            uniforms: {
+                colormap: { value: Block.loadTexture("textures/dirt.png") }, // Default texture
+                renderDistance: { value: rd },
+                renderFade: { value: rf },
+            },
+        });
 
-        Block._sharedMaterials.leaf = shaderMaterial(
-            "leaf_shader.vs",
-            "leaf_shader.fs",
-            {
-                side: FrontSide,
-                transparent: true,
-                uniforms: {
-                    colormap: { value: Block.loadTexture("textures/leaf.png") },
-                    time: { value: 0.0 },
-                    renderDistance: { value: rd },
-                    renderFade: { value: rf },
-                },
-            }
-        );
+        Block._sharedMaterials.leaf = shaderMaterial("leaf_shader.vs", "leaf_shader.fs", {
+            side: FrontSide,
+            transparent: true,
+            uniforms: {
+                colormap: { value: Block.loadTexture("textures/leaf.png") },
+                time: { value: 0.0 },
+                renderDistance: { value: rd },
+                renderFade: { value: rf },
+            },
+        });
 
-        Block._sharedMaterials.water = shaderMaterial(
-            "water_shader.vs",
-            "water_shader.fs",
-            {
-                side: DoubleSide,
-                uniforms: {
-                    colormap: {
-                        value: Block.loadTexture("textures/water.png"),
-                    },
-                    time: { value: 0.0 },
-                    envMap: { value: null },
-                    level: { value: 0.0 },
-                    renderDistance: { value: rd },
-                    renderFade: { value: rf },
+        Block._sharedMaterials.water = shaderMaterial("water_shader.vs", "water_shader.fs", {
+            side: DoubleSide,
+            uniforms: {
+                colormap: {
+                    value: Block.loadTexture("textures/water.png"),
                 },
-                transparent: true,
-                depthTest: true,
-            }
-        );
+                time: { value: 0.0 },
+                envMap: { value: null },
+                level: { value: 0.0 },
+                renderDistance: { value: rd },
+                renderFade: { value: rf },
+            },
+            transparent: true,
+            depthTest: true,
+        });
 
-        Block._sharedMaterials.slime = shaderMaterial(
-            "shader.vs",
-            "leaf_shader.fs",
-            {
-                side: FrontSide,
-                transparent: true,
-                uniforms: {
-                    colormap: {
-                        value: Block.loadTexture("textures/slime.png"),
-                    },
-                    renderDistance: { value: rd },
-                    renderFade: { value: rf },
+        Block._sharedMaterials.slime = shaderMaterial("shader.vs", "leaf_shader.fs", {
+            side: FrontSide,
+            transparent: true,
+            uniforms: {
+                colormap: {
+                    value: Block.loadTexture("textures/slime.png"),
                 },
-            }
-        );
+                renderDistance: { value: rd },
+                renderFade: { value: rf },
+            },
+        });
 
-        Block._sharedMaterials.grass_shader = shaderMaterial(
-            "shader.vs",
-            "leaf_shader.fs",
-            {
-                side: FrontSide,
-                uniforms: {
-                    colormap: {
-                        value: Block.loadTexture("textures/grass_top.png"),
-                    },
-                    renderDistance: { value: rd },
-                    renderFade: { value: rf },
+        Block._sharedMaterials.grass_shader = shaderMaterial("shader.vs", "leaf_shader.fs", {
+            side: FrontSide,
+            uniforms: {
+                colormap: {
+                    value: Block.loadTexture("textures/grass_top.png"),
                 },
-            }
-        );
+                renderDistance: { value: rd },
+                renderFade: { value: rf },
+            },
+        });
     }
 
     static getBlockTable(rd, rf) {
@@ -164,25 +144,16 @@ export class Block {
     }
 
     static updateTime(time) {
-        if (
-            Block._sharedMaterials.leaf &&
-            Block._sharedMaterials.leaf.uniforms.time
-        ) {
+        if (Block._sharedMaterials.leaf && Block._sharedMaterials.leaf.uniforms.time) {
             Block._sharedMaterials.leaf.uniforms.time.value += time;
         }
-        if (
-            Block._sharedMaterials.water &&
-            Block._sharedMaterials.water.uniforms.time
-        ) {
+        if (Block._sharedMaterials.water && Block._sharedMaterials.water.uniforms.time) {
             Block._sharedMaterials.water.uniforms.time.value += time;
         }
     }
 
     static setEnvironmentMap(envMap) {
-        if (
-            Block._sharedMaterials.water &&
-            Block._sharedMaterials.water.uniforms.envMap
-        ) {
+        if (Block._sharedMaterials.water && Block._sharedMaterials.water.uniforms.envMap) {
             Block._sharedMaterials.water.uniforms.envMap.value = envMap;
         }
     }
@@ -223,9 +194,7 @@ export class Block {
         const baseMaterial = Block._sharedMaterials[this.materialType];
 
         if (!baseMaterial) {
-            console.warn(
-                `Material type '${this.materialType}' not found for block '${this.name}'`
-            );
+            console.warn(`Material type '${this.materialType}' not found for block '${this.name}'`);
             return Block._sharedMaterials.standard;
         }
 
@@ -253,11 +222,7 @@ export class Block {
             materialConfig.uniforms.time = {
                 value: baseMaterial.uniforms?.time?.value || 0,
             };
-            return shaderMaterial(
-                "leaf_shader.vs",
-                "leaf_shader.fs",
-                materialConfig
-            );
+            return shaderMaterial("leaf_shader.vs", "leaf_shader.fs", materialConfig);
         } else if (this.materialType === "water") {
             materialConfig.side = DoubleSide;
             materialConfig.depthTest = true;
@@ -270,11 +235,7 @@ export class Block {
             materialConfig.uniforms.level = {
                 value: baseMaterial.uniforms?.level?.value || 0,
             };
-            return shaderMaterial(
-                "water_shader.vs",
-                "water_shader.fs",
-                materialConfig
-            );
+            return shaderMaterial("water_shader.vs", "water_shader.fs", materialConfig);
         } else {
             return shaderMaterial("shader.vs", "shader.fs", materialConfig);
         }

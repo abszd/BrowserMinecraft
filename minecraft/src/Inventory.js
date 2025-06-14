@@ -10,52 +10,15 @@ export class Inventory {
         this.holding = 0;
         this.blockInHand = null;
         this.open = false;
-        this.mousedown = false;
-        this.mouseButton = -1;
 
-        this.draggedItem = null;
-        this.draggedFromSlot = null;
-        this.dragElement = null;
-        this.isDragging = false;
-
-        this.craftingGrid = new Array(9).fill(null);
-        this.craftingResult = null;
-
-        this.recipes = this.initializeRecipes();
+        // Simplified state management
+        this.selectedSlot = null;
+        this.heldItem = null;
+        this.isMouseDown = false;
 
         this.setupEventListeners();
         this.createHotbarOutline();
         this.createInventoryMenu();
-    }
-
-    initializeRecipes() {
-        // Define crafting recipes (simplified examples)
-        return [
-            {
-                pattern: [
-                    [0, 0, 0], // dirt, dirt, null
-                    [0, 0, 0], // dirt, dirt, null
-                    [null, null, null],
-                ],
-                result: { id: 1, count: 4 }, // 4 stone
-            },
-            {
-                pattern: [
-                    [3, 3, null], // oak_log, oak_log
-                    [3, 3, null], // oak_log, oak_log
-                    [null, null, null],
-                ],
-                result: { id: 0, count: 8 }, // 8 dirt
-            },
-            {
-                pattern: [
-                    [1, null, null], // stone
-                    [1, null, null], // stone
-                    [1, null, null], // stone
-                ],
-                result: { id: 3, count: 2 }, // 2 oak_log
-            },
-        ];
     }
 
     setupEventListeners() {
@@ -71,26 +34,11 @@ export class Inventory {
         });
 
         document.addEventListener("mousedown", (event) => {
-            this.mousedown = true;
-            this.mouseButton = event.button;
-            if (this.isDragging && this.dragElement) {
-                this.dragElement.style.left = event.clientX - 25 + "px";
-                this.dragElement.style.top = event.clientY - 25 + "px";
-            }
+            this.isMouseDown = true;
         });
 
         document.addEventListener("mouseup", (event) => {
-            this.mousedown = false;
-            if (this.isDragging) {
-                this.stopDragging(event);
-            }
-        });
-
-        document.addEventListener("mousemove", (event) => {
-            if (this.isDragging && this.dragElement) {
-                this.dragElement.style.left = event.clientX - 25 + "px";
-                this.dragElement.style.top = event.clientY - 25 + "px";
-            }
+            this.isMouseDown = false;
         });
 
         document.addEventListener("keydown", (event) => {
@@ -102,11 +50,15 @@ export class Inventory {
 
     toggleInventory() {
         this.open = !this.open;
-        this.inventoryMenu.style.display = this.open ? "flex" : "none";
+        this.inventoryMenu.style.display = this.open ? "block" : "none";
 
-        // Lock/unlock pointer controls
         if (this.open) {
             document.exitPointerLock();
+        } else {
+            // Return any held item to inventory when closing
+            if (this.heldItem) {
+                this.returnHeldItem();
+            }
         }
     }
 
@@ -118,154 +70,69 @@ export class Inventory {
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            width: 800px;
-            height: 400px;
-            background: rgba(40, 40, 40, 0.95);
-            border: 3px solid #666;
-            border-radius: 8px;
+            width: 540px;
+            height: 320px;
+            background: linear-gradient(135deg, rgba(30, 30, 30, 0.95), rgba(40, 40, 40, 0.95));
+            border: 2px solid #555;
+            border-radius: 12px;
             display: none;
-            flex-direction: column;
-            padding: 20px;
+            padding: 24px;
             z-index: 2000;
-            font-family: monospace;
+            font-family: 'Courier New', monospace;
             color: white;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7);
         `;
 
         // Title
         const title = document.createElement("div");
         title.textContent = "Inventory";
         title.style.cssText = `
-            font-size: 18px;
-            margin-bottom: 15px;
+            font-size: 20px;
+            margin-bottom: 20px;
             text-align: center;
             color: #fff;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
         `;
         this.inventoryMenu.appendChild(title);
-
-        // Main container
-        const mainContainer = document.createElement("div");
-        mainContainer.style.cssText = `
-            display: flex;
-            gap: 20px;
-            flex: 1;
-        `;
-
-        // Inventory grid container
-        const inventoryContainer = document.createElement("div");
-        inventoryContainer.style.cssText = `
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-        `;
-
-        // Inventory label
-        const inventoryLabel = document.createElement("div");
-        inventoryLabel.textContent = "Inventory";
-        inventoryLabel.style.cssText = `
-            font-size: 14px;
-            margin-bottom: 10px;
-            color: #ccc;
-        `;
-        inventoryContainer.appendChild(inventoryLabel);
 
         // Inventory grid
         this.inventoryGrid = document.createElement("div");
         this.inventoryGrid.style.cssText = `
             display: grid;
-            grid-template-columns: repeat(${this.width}, 50px);
-            grid-template-rows: repeat(${this.height}, 50px);
-            gap: 2px;
+            grid-template-columns: repeat(${this.width}, 52px);
+            grid-template-rows: repeat(${this.height}, 52px);
+            gap: 4px;
+            justify-content: center;
             margin-bottom: 20px;
         `;
+
         this.createInventorySlots();
-        inventoryContainer.appendChild(this.inventoryGrid);
-
-        // Crafting container
-        const craftingContainer = document.createElement("div");
-        craftingContainer.style.cssText = `
-            width: 200px;
-            display: flex;
-            flex-direction: column;
-        `;
-
-        // Crafting label
-        const craftingLabel = document.createElement("div");
-        craftingLabel.textContent = "Crafting";
-        craftingLabel.style.cssText = `
-            font-size: 14px;
-            margin-bottom: 10px;
-            color: #ccc;
-        `;
-        craftingContainer.appendChild(craftingLabel);
-
-        // Crafting area
-        const craftingArea = document.createElement("div");
-        craftingArea.style.cssText = `
-            display: flex;
-            gap: 15px;
-            align-items: center;
-        `;
-
-        // Crafting grid (3x3)
-        this.craftingGridElement = document.createElement("div");
-        this.craftingGridElement.style.cssText = `
-            display: grid;
-            grid-template-columns: repeat(3, 40px);
-            grid-template-rows: repeat(3, 40px);
-            gap: 2px;
-            background: rgba(60, 60, 60, 0.8);
-            padding: 5px;
-            border-radius: 4px;
-        `;
-        this.createCraftingSlots();
-
-        // Arrow
-        const arrow = document.createElement("div");
-        arrow.textContent = "→";
-        arrow.style.cssText = `
-            font-size: 24px;
-            color: #fff;
-        `;
-
-        // Result slot
-        this.resultSlot = document.createElement("div");
-        this.resultSlot.className = "result-slot";
-        this.resultSlot.style.cssText = `
-            width: 50px;
-            height: 50px;
-            border: 2px solid #666;
-            background: rgba(80, 80, 80, 0.8);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 4px;
-            position: relative;
-            cursor: pointer;
-        `;
-        this.setupSlotEvents(this.resultSlot, "result", 0);
-
-        craftingArea.appendChild(this.craftingGridElement);
-        craftingArea.appendChild(arrow);
-        craftingArea.appendChild(this.resultSlot);
-        craftingContainer.appendChild(craftingArea);
-
-        mainContainer.appendChild(inventoryContainer);
-        mainContainer.appendChild(craftingContainer);
-        this.inventoryMenu.appendChild(mainContainer);
+        this.inventoryMenu.appendChild(this.inventoryGrid);
 
         // Close button
         const closeButton = document.createElement("button");
         closeButton.textContent = "Close (E)";
         closeButton.style.cssText = `
-            padding: 8px 16px;
-            background: #666;
-            border: none;
-            border-radius: 4px;
+            display: block;
+            margin: 0 auto;
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #555, #666);
+            border: 1px solid #777;
+            border-radius: 6px;
             color: white;
             cursor: pointer;
-            align-self: center;
-            margin-top: 15px;
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: bold;
+            transition: all 0.2s ease;
         `;
+        closeButton.addEventListener("mouseenter", () => {
+            closeButton.style.background = "linear-gradient(135deg, #666, #777)";
+        });
+        closeButton.addEventListener("mouseleave", () => {
+            closeButton.style.background = "linear-gradient(135deg, #555, #666)";
+        });
         closeButton.addEventListener("click", () => this.toggleInventory());
         this.inventoryMenu.appendChild(closeButton);
 
@@ -278,295 +145,158 @@ export class Inventory {
             slot.className = "inventory-slot";
             slot.dataset.index = i;
             slot.style.cssText = `
-                width: 50px;
-                height: 50px;
-                border: 2px solid #666;
-                background: rgba(60, 60, 60, 0.8);
+                width: 52px;
+                height: 52px;
+                border: 2px solid #555;
+                background: linear-gradient(135deg, rgba(50, 50, 50, 0.8), rgba(60, 60, 60, 0.8));
                 display: flex;
-                align-items: center;
-                justify-content: center;
-                border-radius: 4px;
+                align-items: flex-end;
+                justify-content: flex-end;
+                border-radius: 6px;
                 position: relative;
                 cursor: pointer;
-                font-size: 12px;
+                font-size: 11px;
                 color: white;
                 font-weight: bold;
-                text-shadow: 1px 1px 0px #000;
+                text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+                padding: 2px;
+                transition: all 0.15s ease;
+                box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3);
             `;
-            this.setupSlotEvents(slot, "inventory", i);
+
+            this.setupSlotEvents(slot, i);
             this.inventoryGrid.appendChild(slot);
         }
     }
 
-    createCraftingSlots() {
-        for (let i = 0; i < 9; i++) {
-            const slot = document.createElement("div");
-            slot.className = "crafting-slot";
-            slot.dataset.index = i;
-            slot.style.cssText = `
-                width: 40px;
-                height: 40px;
-                border: 2px solid #666;
-                background: rgba(80, 80, 80, 0.8);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                border-radius: 4px;
-                position: relative;
-                cursor: pointer;
-                font-size: 10px;
-                color: white;
-                font-weight: bold;
-                text-shadow: 1px 1px 0px #000;
-            `;
-            this.setupSlotEvents(slot, "crafting", i);
-            this.craftingGridElement.appendChild(slot);
-        }
-    }
+    setupSlotEvents(slot, index) {
+        slot.addEventListener("mouseenter", () => {
+            if (!this.heldItem) {
+                slot.style.borderColor = "#777";
+                slot.style.transform = "scale(1.05)";
+            }
+        });
 
-    setupSlotEvents(slot, type, index) {
-        slot.addEventListener("mousedown", (event) => {
+        slot.addEventListener("mouseleave", () => {
+            slot.style.borderColor = "#555";
+            slot.style.transform = "scale(1)";
+        });
+
+        slot.addEventListener("click", (event) => {
             event.preventDefault();
-            if (this.mouseButton === 0) {
-                // Left click
-                this.startDragging(type, index, event);
-            } else if (this.mouseButton === 2) {
-                // Right click
-                this.splitStack(type, index);
-            }
+            this.handleSlotClick(index, event.button === 2);
         });
 
-        slot.addEventListener("mouseup", (event) => {
-            if (this.isDragging) {
-                this.dropItem(type, index);
-            }
-        });
-
-        slot.addEventListener("dragover", (event) => {
+        slot.addEventListener("contextmenu", (event) => {
             event.preventDefault();
+            this.handleSlotClick(index, true);
         });
     }
 
-    startDragging(type, index, event) {
-        let item = null;
+    handleSlotClick(index, isRightClick) {
+        const slotItem = this.inventory[index];
 
-        if (type === "inventory") {
-            item = this.inventory[index];
-        } else if (type === "crafting") {
-            item = this.craftingGrid[index];
-        } else if (type === "result") {
-            item = this.craftingResult;
-        }
-
-        if (!item) return;
-
-        this.isDragging = true;
-        this.draggedItem = { ...item };
-        this.draggedFromSlot = { type, index };
-
-        // Clear the original slot
-        if (type === "inventory") {
-            this.inventory[index] = null;
-        } else if (type === "crafting") {
-            this.craftingGrid[index] = null;
-            this.updateCraftingResult();
-        }
-
-        // Create drag element
-        this.dragElement = document.createElement("div");
-        this.dragElement.style.cssText = `
-            position: fixed;
-            width: 50px;
-            height: 50px;
-            background-image: url('icons/${
-                this.mgr.idBlockTypeLookup[item.id]
-            }.png');
-            background-size: contain;
-            background-repeat: no-repeat;
-            background-position: center;
-            pointer-events: none;
-            z-index: 3000;
-            border-radius: 4px;
-            display: flex;
-            align-items: flex-end;
-            justify-content: flex-end;
-            font-size: 12px;
-            color: white;
-            font-weight: bold;
-            text-shadow: 1px 1px 0px #000;
-            padding: 2px;
-        `;
-        this.dragElement.textContent = item.count > 1 ? item.count : "";
-        document.body.appendChild(this.dragElement);
-
-        this.updateDisplay();
-    }
-
-    stopDragging(event) {
-        if (this.dragElement) {
-            document.body.removeChild(this.dragElement);
-            this.dragElement = null;
-        }
-
-        // If dragging ended without dropping on a valid slot, return item to original position
-        if (this.isDragging && this.draggedItem && this.draggedFromSlot) {
-            const { type, index } = this.draggedFromSlot;
-            if (type === "inventory") {
-                this.inventory[index] = this.draggedItem;
-            } else if (type === "crafting") {
-                this.craftingGrid[index] = this.draggedItem;
-                this.updateCraftingResult();
-            }
-        }
-
-        this.isDragging = false;
-        this.draggedItem = null;
-        this.draggedFromSlot = null;
-        this.updateDisplay();
-    }
-
-    dropItem(targetType, targetIndex) {
-        if (!this.isDragging || !this.draggedItem) return;
-
-        let targetArray = null;
-        if (targetType === "inventory") {
-            targetArray = this.inventory;
-        } else if (targetType === "crafting") {
-            targetArray = this.craftingGrid;
-        } else if (targetType === "result") {
-            // Can't drop on result slot
+        if (!this.heldItem && !slotItem) {
+            // Clicking empty slot with empty hand - do nothing
             return;
         }
 
-        const existingItem = targetArray[targetIndex];
+        if (!this.heldItem && slotItem) {
+            // Pick up item from slot
+            if (isRightClick) {
+                // Right click - pick up half
+                const halfCount = Math.ceil(slotItem.count / 2);
+                this.heldItem = { id: slotItem.id, count: halfCount };
+                slotItem.count -= halfCount;
 
-        if (!existingItem) {
-            // Empty slot - place item
-            targetArray[targetIndex] = this.draggedItem;
-        } else if (existingItem.id === this.draggedItem.id) {
-            // Same item type - try to stack
-            const totalCount = existingItem.count + this.draggedItem.count;
-            if (totalCount <= this.stackSize) {
-                existingItem.count = totalCount;
+                if (slotItem.count === 0) {
+                    this.inventory[index] = null;
+                }
             } else {
-                existingItem.count = this.stackSize;
-                this.draggedItem.count = totalCount - this.stackSize;
-                // Return excess to original slot
-                const { type, index } = this.draggedFromSlot;
-                if (type === "inventory") {
-                    this.inventory[index] = this.draggedItem;
-                } else if (type === "crafting") {
-                    this.craftingGrid[index] = this.draggedItem;
+                // Left click - pick up all
+                this.heldItem = { ...slotItem };
+                this.inventory[index] = null;
+            }
+            this.selectedSlot = index;
+        } else if (this.heldItem && !slotItem) {
+            // Place item in empty slot
+            if (isRightClick) {
+                // Right click - place one
+                this.inventory[index] = { id: this.heldItem.id, count: 1 };
+                this.heldItem.count--;
+
+                if (this.heldItem.count === 0) {
+                    this.heldItem = null;
+                    this.selectedSlot = null;
                 }
+            } else {
+                // Left click - place all
+                this.inventory[index] = { ...this.heldItem };
+                this.heldItem = null;
+                this.selectedSlot = null;
             }
-        } else {
-            // Different item - swap
-            targetArray[targetIndex] = this.draggedItem;
-            const { type, index } = this.draggedFromSlot;
-            if (type === "inventory") {
-                this.inventory[index] = existingItem;
-            } else if (type === "crafting") {
-                this.craftingGrid[index] = existingItem;
-            }
-        }
+        } else if (this.heldItem && slotItem) {
+            // Both hand and slot have items
+            if (this.heldItem.id === slotItem.id) {
+                // Same item type - try to stack
+                const canAdd = Math.min(this.heldItem.count, this.stackSize - slotItem.count);
+                slotItem.count += canAdd;
+                this.heldItem.count -= canAdd;
 
-        if (targetType === "crafting") {
-            this.updateCraftingResult();
-        }
-
-        // Clear dragging state
-        this.isDragging = false;
-        this.draggedItem = null;
-        this.draggedFromSlot = null;
-
-        if (this.dragElement) {
-            document.body.removeChild(this.dragElement);
-            this.dragElement = null;
-        }
-
-        this.updateDisplay();
-    }
-
-    splitStack(type, index) {
-        let item = null;
-        let array = null;
-
-        if (type === "inventory") {
-            item = this.inventory[index];
-            array = this.inventory;
-        } else if (type === "crafting") {
-            item = this.craftingGrid[index];
-            array = this.craftingGrid;
-        }
-
-        if (!item || item.count <= 1) return;
-
-        const halfCount = Math.floor(item.count / 2);
-        item.count -= halfCount;
-
-        const newItem = { id: item.id, count: halfCount };
-        if (type === "inventory") {
-            const emptyIndex = this.inventory.findIndex((slot) => !slot);
-            if (emptyIndex !== -1) {
-                this.inventory[emptyIndex] = newItem;
+                if (this.heldItem.count === 0) {
+                    this.heldItem = null;
+                    this.selectedSlot = null;
+                }
+            } else {
+                // Different items - swap
+                const tempItem = { ...slotItem };
+                this.inventory[index] = { ...this.heldItem };
+                this.heldItem = tempItem;
             }
         }
 
         this.updateDisplay();
-        if (type === "crafting") {
-            this.updateCraftingResult();
-        }
+        this.updateHotbarOutline();
     }
 
-    updateCraftingResult() {
-        this.craftingResult = null;
+    returnHeldItem() {
+        if (!this.heldItem) return;
 
-        // Convert crafting grid to pattern
-        const pattern = [];
-        for (let row = 0; row < 3; row++) {
-            pattern[row] = [];
-            for (let col = 0; col < 3; col++) {
-                const index = row * 3 + col;
-                const item = this.craftingGrid[index];
-                pattern[row][col] = item ? item.id : null;
+        // Try to return to original slot first
+        if (this.selectedSlot !== null && !this.inventory[this.selectedSlot]) {
+            this.inventory[this.selectedSlot] = this.heldItem;
+            this.heldItem = null;
+            this.selectedSlot = null;
+            this.updateDisplay();
+            return;
+        }
+
+        // Find any empty slot
+        for (let i = 0; i < this.inventory.length; i++) {
+            if (!this.inventory[i]) {
+                this.inventory[i] = this.heldItem;
+                this.heldItem = null;
+                this.selectedSlot = null;
+                this.updateDisplay();
+                return;
             }
         }
 
-        // Check against recipes
-        for (const recipe of this.recipes) {
-            if (this.patternsMatch(pattern, recipe.pattern)) {
-                this.craftingResult = { ...recipe.result };
-                break;
-            }
-        }
+        // Try to stack with existing items
+        for (let i = 0; i < this.inventory.length; i++) {
+            const item = this.inventory[i];
+            if (item && item.id === this.heldItem.id && item.count < this.stackSize) {
+                const canAdd = Math.min(this.heldItem.count, this.stackSize - item.count);
+                item.count += canAdd;
+                this.heldItem.count -= canAdd;
 
-        this.updateResultSlot();
-    }
-
-    patternsMatch(pattern1, pattern2) {
-        for (let row = 0; row < 3; row++) {
-            for (let col = 0; col < 3; col++) {
-                if (pattern1[row][col] !== pattern2[row][col]) {
-                    return false;
+                if (this.heldItem.count === 0) {
+                    this.heldItem = null;
+                    this.selectedSlot = null;
+                    this.updateDisplay();
+                    return;
                 }
             }
-        }
-        return true;
-    }
-
-    updateResultSlot() {
-        if (this.craftingResult) {
-            this.resultSlot.style.backgroundImage = `url('icons/${
-                this.mgr.idBlockTypeLookup[this.craftingResult.id]
-            }.png')`;
-            this.resultSlot.style.backgroundSize = "contain";
-            this.resultSlot.style.backgroundRepeat = "no-repeat";
-            this.resultSlot.style.backgroundPosition = "center";
-            this.resultSlot.textContent =
-                this.craftingResult.count > 1 ? this.craftingResult.count : "";
-        } else {
-            this.resultSlot.style.backgroundImage = "none";
-            this.resultSlot.textContent = "";
         }
     }
 
@@ -616,16 +346,15 @@ export class Inventory {
     }
 
     updateDisplay() {
-        // Update inventory grid
+        if (!this.inventoryGrid) return;
+
         for (let i = 0; i < this.width * this.height; i++) {
             const slot = this.inventoryGrid.children[i];
             const item = this.inventory[i];
 
             if (item) {
-                slot.style.backgroundImage = `url('icons/${
-                    this.mgr.idBlockTypeLookup[item.id]
-                }.png')`;
-                slot.style.backgroundSize = "contain";
+                slot.style.backgroundImage = `url('icons/${this.mgr.idBlockTypeLookup[item.id]}.png')`;
+                slot.style.backgroundSize = "36px 36px";
                 slot.style.backgroundRepeat = "no-repeat";
                 slot.style.backgroundPosition = "center";
                 slot.textContent = item.count > 1 ? item.count : "";
@@ -633,24 +362,14 @@ export class Inventory {
                 slot.style.backgroundImage = "none";
                 slot.textContent = "";
             }
-        }
 
-        // Update crafting grid
-        for (let i = 0; i < 9; i++) {
-            const slot = this.craftingGridElement.children[i];
-            const item = this.craftingGrid[i];
-
-            if (item) {
-                slot.style.backgroundImage = `url('icons/${
-                    this.mgr.idBlockTypeLookup[item.id]
-                }.png')`;
-                slot.style.backgroundSize = "contain";
-                slot.style.backgroundRepeat = "no-repeat";
-                slot.style.backgroundPosition = "center";
-                slot.textContent = item.count > 1 ? item.count : "";
+            // Highlight selected slot
+            if (this.selectedSlot === i && this.heldItem) {
+                slot.style.borderColor = "#ffaa00";
+                slot.style.boxShadow = "inset 0 0 8px rgba(255, 170, 0, 0.5)";
             } else {
-                slot.style.backgroundImage = "none";
-                slot.textContent = "";
+                slot.style.borderColor = "#555";
+                slot.style.boxShadow = "inset 0 1px 3px rgba(0, 0, 0, 0.3)";
             }
         }
     }
@@ -658,12 +377,9 @@ export class Inventory {
     updateHotbarOutline() {
         for (let i = 0; i < this.width; i++) {
             if (i === this.holding) {
-                this.blockInHand = this.inventory[this.holding]
-                    ? this.inventory[this.holding].id
-                    : null;
+                this.blockInHand = this.inventory[this.holding] ? this.inventory[this.holding].id : null;
             }
-            this.hotbar.childNodes[i].style.border =
-                i === this.holding ? "2px solid #fff" : "2px solid #666";
+            this.hotbar.childNodes[i].style.border = i === this.holding ? "2px solid #fff" : "2px solid #666";
 
             if (this.inventory[i]) {
                 this.hotbar.childNodes[i].style.backgroundImage = `url('icons/${
@@ -709,8 +425,7 @@ export class Inventory {
             slot.className = "hotbar-slot";
             slot.style.width = "50px";
             slot.style.height = "50px";
-            slot.style.border =
-                i === this.holding ? "2px solid #fff" : "2px solid #666";
+            slot.style.border = i === this.holding ? "2px solid #fff" : "2px solid #666";
             slot.style.display = "flex";
             slot.style.alignItems = "center";
             slot.style.justifyContent = "center";

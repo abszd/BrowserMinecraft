@@ -1,9 +1,27 @@
+import { SplineCurve, Vector2 } from "three";
+
+function workerLog(...args) {
+    self.postMessage({
+        type: "log",
+        data: args.map((arg) => (typeof arg === "object" ? JSON.stringify(arg) : String(arg))).join(" "),
+    });
+}
 class ChunkWorker {
     constructor() {
         this.chunks = new Map();
         this.blockTable = null;
         this.worldSeed = 69420;
         this._globalPerm = null;
+        this.continentalSpline = new SplineCurve([
+            new Vector2(0, 0.01),
+            new Vector2(0.1, 0.1),
+            new Vector2(0.25, 0.1),
+            new Vector2(0.5, 0.3),
+            new Vector2(0.65, 0.4),
+            new Vector2(0.7, 0.6),
+            new Vector2(0.8, 0.85),
+            new Vector2(1, 0.5),
+        ]);
     }
 
     initialize(params) {
@@ -96,15 +114,32 @@ class WorkerChunk {
         this.grid = new Map();
         this.waterBlocks = [];
         this.lastAccessed = Date.now();
-        this.waterLevel = 6;
+        this.waterLevel = Math.floor(this.worker.amplitude / 3);
         this.TRANSPARENT_BLOCKS = new Set([-1, 4, 5]);
+        this.CSpline = new SplineCurve([new Vector2(0, 0), new Vector2(0.75, 0.25), new Vector2(1, 1)]);
+        this.MVSpline = new SplineCurve([
+            new Vector2(0, 0.1),
+            new Vector2(0.1, 0.2),
+            new Vector2(0.2, 0.6),
+            new Vector2(0.4, 0.2),
+            new Vector2(0.5, 1),
+            new Vector2(0.75, 0.6),
+            new Vector2(1, 0.6),
+        ]);
+        this.PVSpline = new SplineCurve([
+            new Vector2(0, 0.0),
+            new Vector2(0.43, 0.2),
+            new Vector2(0.8, 1),
+            new Vector2(0.83, 0.7),
+            new Vector2(1, 0.7),
+        ]);
     }
 
     generateTerrain() {
         const heightCache = new Map();
-
-        const stoneSlope = 3;
-        const dirtSlope = 2;
+        //workerLog(this.worker.amplitude, this.waterLevel);
+        const stoneSlope = 2.5;
+        const dirtSlope = 1.5;
 
         for (let localX = -1; localX <= this.size; localX++) {
             for (let localZ = -1; localZ <= this.size; localZ++) {
@@ -125,12 +160,14 @@ class WorkerChunk {
                 const gradientX = (heightR - heightL) / 2.0;
                 const gradientZ = (heightF - heightB) / 2.0;
 
-                const slope = Math.sqrt(gradientX * gradientX + gradientZ * gradientZ);
+                const slope = (gradientX + gradientZ) / 2;
 
                 for (let y = 0; y < height; y++) {
                     let blockType;
                     if (y < height - 4) {
                         blockType = 1; // Stone (deep)
+                    } else if (y - this.waterLevel <= 1) {
+                        blockType = 7;
                     } else if (y < height - 1) {
                         if (slope > dirtSlope) {
                             blockType = 1;
@@ -138,13 +175,15 @@ class WorkerChunk {
                             blockType = 0;
                         }
                     } else {
-                        if (slope > stoneSlope) {
-                            blockType = 1;
-                        } else {
+                        if (slope < dirtSlope) {
                             blockType = 2;
+                        } else if (slope < stoneSlope) {
+                            blockType = 0;
+                        } else {
+                            blockType = 1;
                         }
+                        //if (Math.pow(y / this.worker.amplitude, 4) > Math.random()) blockType = 0;
                     }
-
                     this.setBlock(localX, y, localZ, blockType);
                 }
             }
@@ -152,48 +191,37 @@ class WorkerChunk {
     }
 
     generateHeightAt(worldX, worldZ) {
-        const amplitude = this.worker.amplitude || 32;
-        const octaves = 3;
-        const baseFrequency = 0.002;
+        const baseFreq = 0.003;
+        let continentalNoise = this.getNoise(3, baseFreq, 0.5, worldX, worldZ);
+        let mountainValleyNoise = this.getNoise(3, baseFreq * 2, 0.5, worldX, worldZ);
+        let peakNoise = this.getNoise(3, 0.03, 0.5, worldX, worldZ);
 
+        const cHeight = this.CSpline.getPoint(continentalNoise).y;
+        const mvHeight = this.MVSpline.getPoint(mountainValleyNoise).y;
+        const pvHeight = this.PVSpline.getPoint(peakNoise).y;
+
+        const base = cHeight;
+        const mountain = base + mvHeight * cHeight;
+        const peaks = mountain + pvHeight * mvHeight * cHeight;
+        const final = peaks * this.worker.amplitude;
+
+        return Math.min(this.worker.chunkHeight, final);
+    }
+
+    getNoise(octaves, freq, amplitudeDif, worldX, worldZ) {
         let total = 0;
-        let frequency = baseFrequency;
+        let frequency = freq;
         let maxAmplitude = 0;
         let currentAmplitude = 1;
-        let amplitudeChange = 0.5;
 
-        for (let octave = 0; octave < octaves; octave++) {
-            const nx = worldX * frequency;
-            const nz = worldZ * frequency;
-
-            const noiseValue = this.perlin2d(nx, nz);
-
+        for (let i = 0; i < octaves; i++) {
+            const noiseValue = this.perlin2d(worldX * frequency, worldZ * frequency);
             total += noiseValue * currentAmplitude;
             maxAmplitude += currentAmplitude;
             frequency *= 2;
-            currentAmplitude *= amplitudeChange;
+            currentAmplitude *= amplitudeDif;
         }
-        frequency = 0.02;
-        currentAmplitude = 1;
-        maxAmplitude = 0;
-        for (let octave = 0; octave < octaves; octave++) {
-            const nx = worldX * frequency;
-            const nz = worldZ * frequency;
-
-            const noiseValue = this.perlin2d(nx, nz);
-
-            total += noiseValue * currentAmplitude;
-            maxAmplitude += currentAmplitude;
-            frequency *= 2;
-            currentAmplitude *= amplitudeChange;
-        }
-
-        total /= maxAmplitude;
-        let height = ((total + 1) * amplitude) / 2;
-        height = Math.pow(height / amplitude, 1.5) * amplitude;
-        height = amplitude / (1 + Math.exp(-10 * (height / amplitude - 0.5)));
-
-        return Math.floor(Math.max(0, Math.min(amplitude, height))) + 5;
+        return (total / maxAmplitude + 1) / 2;
     }
 
     perlin2d(x, z) {
@@ -255,7 +283,6 @@ class WorkerChunk {
 
                 const blockId = this.getBlock(x, y, z);
                 if (blockId === 2) {
-                    // grass
                     if (Math.random() < treeChance) {
                         this.buildTree(x, y, z);
                     }
@@ -295,7 +322,7 @@ class WorkerChunk {
                         y + ly < this.height
                     ) {
                         if (this.getBlock(worldX, y + ly, worldZ) === -1) {
-                            this.setBlock(worldX, y + ly, worldZ, 4); // leaf
+                            this.setBlock(worldX, y + ly, worldZ, 4);
                         }
                     }
                 }
@@ -308,25 +335,15 @@ class WorkerChunk {
 
         for (let x = 0; x < this.size; x++) {
             for (let z = 0; z < this.size; z++) {
-                let foundSolid = false;
-                let waterStart = -1;
-
                 for (let y = 0; y < this.height; y++) {
                     const blockId = this.getBlock(x, y, z);
-
                     if (blockId === 5) {
                         const blockAbove = this.getBlock(x, y + 1, z);
                         const isTopWater = blockAbove !== 5;
+
                         this.waterBlocks.push({ x, y, z, isTopWater });
-                        continue;
                     }
-
-                    if (y > this.waterLevel || blockId !== -1) {
-                        foundSolid = blockId !== -1;
-                        continue;
-                    }
-
-                    if (y >= 3) {
+                    if (y >= 3 && y <= this.waterLevel && blockId === -1) {
                         this.setBlock(x, y, z, 5);
                         const isTopWater = y === this.waterLevel;
                         this.waterBlocks.push({ x, y, z, isTopWater });

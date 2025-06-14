@@ -38,10 +38,14 @@ void main() {
     float luminance = dot(finalColor, vec3(0.299, 0.587, 0.114));
     float saturationFactor = 2.; 
     finalColor = mix(vec3(luminance), finalColor, saturationFactor);
-    
     float warmth = max(0.0, dot(v_normal, lightDir));
     finalColor = mix(finalColor, finalColor * vec3(1.05, 1.0, 0.95), warmth * 0.2);
     
+    //ao 
+    // vec2 edgeDist = min(fract(v_uv), 1. - fract(v_uv));
+    // float ao = smoothstep(0.0, .4, (edgeDist.x + edgeDist.y) * 0.5);
+    // finalColor *= ao * 2.;
+
     finalColor = pow(finalColor, vec3(0.85)); 
     
     finalColor = mix(finalColor, vec3(.7, .9, 1.), fogFactor);

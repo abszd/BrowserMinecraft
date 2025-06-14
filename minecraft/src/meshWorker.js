@@ -1,3 +1,9 @@
+function workerLog(...args) {
+    self.postMessage({
+        type: "log",
+        data: args.map((arg) => (typeof arg === "object" ? JSON.stringify(arg) : String(arg))).join(" "),
+    });
+}
 class MeshWorker {
     constructor() {
         this.TRANSPARENT_BLOCKS = new Set([-1, 4, 5]); // Air, Water, Leaves
@@ -14,12 +20,6 @@ class MeshWorker {
         });
     }
 
-    getBlock(grid, x, y, z) {
-        const key = `${x} ${y} ${z}`;
-        const blockId = grid.get(key);
-        return blockId === undefined ? -1 : blockId;
-    }
-
     createGreedyMesh(chunkData) {
         const { grid, size, height, chunkX, chunkZ } = chunkData;
         const worldOffsetX = chunkX * size;
@@ -27,126 +27,107 @@ class MeshWorker {
         let rects = [];
 
         const chunkGrid = new Map(grid);
-
-        // X-AXIS faces
         for (let x = 0; x < size; x++) {
-            let maskE = Array(height)
-                .fill()
-                .map(() => Array(size).fill(-1));
-            let maskW = Array(height)
-                .fill()
-                .map(() => Array(size).fill(-1));
-
+            const total = height * size;
+            let maskE = new Int8Array(total);
+            let maskW = new Int8Array(total);
+            let maskN = new Int8Array(total);
+            let maskS = new Int8Array(total);
+            let found = false;
             for (let y = 0; y < height; y++) {
                 for (let z = 0; z < size; z++) {
-                    const blockId = this.getBlock(chunkGrid, x, y, z);
+                    let blockId = chunkGrid.get(`${x} ${y} ${z}`);
 
-                    if (blockId !== -1 && blockId !== 5) {
-                        let neighbor = x === size - 1 ? -1 : this.getBlock(chunkGrid, x + 1, y, z);
+                    const idx = y * size + z;
+                    if (blockId !== undefined && blockId !== 5) {
+                        found = true;
+                        let neighbor = chunkGrid.get(`${x + 1} ${y} ${z}`) ?? -1;
                         if (this.TRANSPARENT_BLOCKS.has(neighbor) && blockId !== neighbor) {
-                            maskE[y][z] = blockId;
+                            maskE[idx] = blockId + 1;
                         }
 
-                        neighbor = x === 0 ? -1 : this.getBlock(chunkGrid, x - 1, y, z);
+                        neighbor = chunkGrid.get(`${x - 1} ${y} ${z}`) ?? -1;
                         if (this.TRANSPARENT_BLOCKS.has(neighbor) && blockId !== neighbor) {
-                            maskW[y][z] = blockId;
+                            maskW[idx] = blockId + 1;
+                        }
+                    }
+
+                    blockId = chunkGrid.get(`${z} ${y} ${x}`);
+                    if (blockId !== undefined && blockId !== 5) {
+                        found = true;
+                        let neighbor = chunkGrid.get(`${z} ${y} ${x + 1}`) ?? -1;
+                        if (this.TRANSPARENT_BLOCKS.has(neighbor) && blockId !== neighbor) {
+                            maskN[idx] = blockId + 1;
+                        }
+
+                        neighbor = chunkGrid.get(`${z} ${y} ${x - 1}`) ?? -1;
+                        if (this.TRANSPARENT_BLOCKS.has(neighbor) && blockId !== neighbor) {
+                            maskS[idx] = blockId + 1;
                         }
                     }
                 }
             }
+            if (!found) continue;
 
-            rects.push(...this.getGreedySlice(maskE, 0, x, 0, worldOffsetX, worldOffsetZ));
-            rects.push(...this.getGreedySlice(maskW, 0, x, 1, worldOffsetX, worldOffsetZ));
-        }
-
-        // Z-AXIS faces
-        for (let z = 0; z < size; z++) {
-            let maskN = Array(height)
-                .fill()
-                .map(() => Array(size).fill(-1));
-            let maskS = Array(height)
-                .fill()
-                .map(() => Array(size).fill(-1));
-
-            for (let y = 0; y < height; y++) {
-                for (let x = 0; x < size; x++) {
-                    const blockId = this.getBlock(chunkGrid, x, y, z);
-
-                    if (blockId !== -1 && blockId !== 5) {
-                        let neighbor = z === size - 1 ? -1 : this.getBlock(chunkGrid, x, y, z + 1);
-                        if (this.TRANSPARENT_BLOCKS.has(neighbor) && blockId !== neighbor) {
-                            maskN[y][x] = blockId;
-                        }
-
-                        neighbor = z === 0 ? -1 : this.getBlock(chunkGrid, x, y, z - 1);
-                        if (this.TRANSPARENT_BLOCKS.has(neighbor) && blockId !== neighbor) {
-                            maskS[y][x] = blockId;
-                        }
-                    }
-                }
-            }
-
-            rects.push(...this.getGreedySlice(maskN, 2, z, 0, worldOffsetX, worldOffsetZ));
-            rects.push(...this.getGreedySlice(maskS, 2, z, 1, worldOffsetX, worldOffsetZ));
+            rects.push(...this.getGreedySlice(maskE, height, size, 0, x, 0, worldOffsetX, worldOffsetZ));
+            rects.push(...this.getGreedySlice(maskW, height, size, 0, x, 1, worldOffsetX, worldOffsetZ));
+            rects.push(...this.getGreedySlice(maskN, height, size, 2, x, 0, worldOffsetX, worldOffsetZ));
+            rects.push(...this.getGreedySlice(maskS, height, size, 2, x, 1, worldOffsetX, worldOffsetZ));
         }
 
         // Y-AXIS faces
         for (let y = 0; y < height; y++) {
-            let maskU = Array(size)
-                .fill()
-                .map(() => Array(size).fill(-1));
-            let maskD = Array(size)
-                .fill()
-                .map(() => Array(size).fill(-1));
-
+            let maskU = new Int8Array(size * size);
+            let maskD = new Int8Array(size * size);
+            let found = false;
             for (let x = 0; x < size; x++) {
                 for (let z = 0; z < size; z++) {
-                    const blockId = this.getBlock(chunkGrid, x, y, z);
+                    const idx = x * size + z;
+                    const blockId = chunkGrid.get(`${x} ${y} ${z}`);
 
-                    if (blockId !== -1 && blockId !== 5) {
-                        const upperNeighbor = this.getBlock(chunkGrid, x, y + 1, z);
-                        if (this.TRANSPARENT_BLOCKS.has(upperNeighbor) && blockId !== upperNeighbor) {
-                            maskU[x][z] = blockId;
+                    if (blockId !== undefined && blockId !== 5) {
+                        found = true;
+                        let neighbor = chunkGrid.get(`${x} ${y + 1} ${z}`) ?? -1;
+                        if (this.TRANSPARENT_BLOCKS.has(neighbor) && blockId !== neighbor) {
+                            maskU[idx] = blockId + 1;
                         }
 
-                        const lowerNeighbor = this.getBlock(chunkGrid, x, y - 1, z);
-                        if (this.TRANSPARENT_BLOCKS.has(lowerNeighbor) && blockId !== lowerNeighbor) {
-                            maskD[x][z] = blockId;
+                        neighbor = chunkGrid.get(`${x} ${y - 1} ${z}`) ?? -1;
+                        if (this.TRANSPARENT_BLOCKS.has(neighbor) && blockId !== neighbor) {
+                            maskD[idx] = blockId + 1;
                         }
                     }
                 }
             }
-
-            rects.push(...this.getGreedySlice(maskU, 1, y, 0, worldOffsetX, worldOffsetZ));
-            rects.push(...this.getGreedySlice(maskD, 1, y, 1, worldOffsetX, worldOffsetZ));
+            if (!found) continue;
+            rects.push(...this.getGreedySlice(maskU, size, size, 1, y, 0, worldOffsetX, worldOffsetZ));
+            rects.push(...this.getGreedySlice(maskD, size, size, 1, y, 1, worldOffsetX, worldOffsetZ));
         }
 
         return this.makeGreedyMeshData(rects);
     }
 
-    getGreedySlice(slice, axis, pos, dir, worldOffsetX = 0, worldOffsetZ = 0) {
-        let n = slice.length;
-        let m = slice[0].length;
-        let rectangles = [];
+    getGreedySlice(slice, n, m, axis, pos, dir, worldOffsetX = 0, worldOffsetZ = 0) {
+        const rectangles = [];
 
         for (let i = 0; i < n; i++) {
             for (let j = 0; j < m; j++) {
-                if (slice[i][j] == -1) {
+                const block = slice[i * m + j];
+                if (block <= 0) {
                     continue;
                 }
 
-                let block = slice[i][j];
                 let rx1 = j,
                     rx2 = j;
                 let ry1 = i,
                     ry2 = i;
 
-                while (++rx2 < m && slice[i][rx2] === block) {}
+                while (++rx2 < m && slice[i * m + rx2] === block) {}
 
                 while (++ry2 < n) {
                     let same = true;
                     for (let rx = rx1; rx < rx2; rx++) {
-                        if (slice[ry2][rx] !== block) {
+                        if (slice[ry2 * m + rx] !== block) {
                             same = false;
                             break;
                         }
@@ -155,24 +136,25 @@ class MeshWorker {
                         break;
                     }
                 }
-
-                rectangles.push(this.createRect(slice, rx1, rx2, ry1, ry2, axis, pos, dir, worldOffsetX, worldOffsetZ));
+                const blockType = this.idBlockTypeLookup[block - 1];
+                if (blockType === undefined) continue;
+                rectangles.push(
+                    this.createRect(blockType, m, rx1, rx2, ry1, ry2, axis, pos, dir, worldOffsetX, worldOffsetZ)
+                );
+                for (let i = ry1; i < ry2; i++) {
+                    for (let j = rx1; j < rx2; j++) {
+                        slice[i * m + j] = 0;
+                    }
+                }
             }
         }
         return rectangles;
     }
 
-    createRect(slice, x1, x2, y1, y2, axis, pos, dir, worldOffsetX = 0, worldOffsetZ = 0) {
-        const blockType = this.idBlockTypeLookup[slice[y1][x1]];
+    createRect(blockType, m, x1, x2, y1, y2, axis, pos, dir, worldOffsetX = 0, worldOffsetZ = 0) {
         let vertices, normal, uvs;
         const width = x2 - x1;
         const height = y2 - y1;
-
-        for (let i = y1; i < y2; i++) {
-            for (let j = x1; j < x2; j++) {
-                slice[i][j] = -1;
-            }
-        }
 
         let face = "side";
         if (axis === 1) {

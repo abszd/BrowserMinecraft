@@ -45,61 +45,37 @@ export class Chunk {
         this.mesh = new Group();
 
         if (terrainMeshData && Object.keys(terrainMeshData).length > 0) {
-            for (const [meshKey, meshData] of Object.entries(terrainMeshData)) {
-                if (meshData.positions.length === 0) continue;
-
-                const [blockType, face = "side"] = meshKey.split("-");
+            const meshes = Object.entries(terrainMeshData);
+            for (let i = 0; i < meshes.length; i++) {
+                if (meshes[i][1].positions.length === 0) return;
+                const [blockType, face = "side"] = meshes[i][0].split("-");
 
                 const material = this.getBlockMaterial(blockType, face);
-
                 if (!material) {
-                    console.warn(`No material found for ${blockType} ${face}`);
-                    continue;
+                    console.warn(`No material found for blockType: ${blockType}, face: ${face}`);
+                    continue; // Skip this mesh if no material
                 }
 
                 const geometry = new BufferGeometry();
-                geometry.setAttribute(
-                    "position",
-                    new Float32BufferAttribute(meshData.positions, 3)
-                );
-                geometry.setAttribute(
-                    "normal",
-                    new Float32BufferAttribute(meshData.normals, 3)
-                );
-                geometry.setAttribute(
-                    "uv",
-                    new Float32BufferAttribute(meshData.uvs, 2)
-                );
-                geometry.setIndex(meshData.indices);
-
+                geometry.setAttribute("position", new Float32BufferAttribute(meshes[i][1].positions, 3));
+                geometry.setAttribute("normal", new Float32BufferAttribute(meshes[i][1].normals, 3));
+                geometry.setAttribute("uv", new Float32BufferAttribute(meshes[i][1].uvs, 2));
+                geometry.setIndex(meshes[i][1].indices);
                 const mesh = new Mesh(geometry, material);
                 this.mesh.add(mesh);
             }
         }
+        //console.log(this.mesh);
 
         if (waterMeshData && waterMeshData.positions.length > 0) {
             const waterGeometry = new BufferGeometry();
-            waterGeometry.setAttribute(
-                "position",
-                new Float32BufferAttribute(waterMeshData.positions, 3)
-            );
-            waterGeometry.setAttribute(
-                "normal",
-                new Float32BufferAttribute(waterMeshData.normals, 3)
-            );
-            waterGeometry.setAttribute(
-                "uv",
-                new Float32BufferAttribute(waterMeshData.uvs, 2)
-            );
+            waterGeometry.setAttribute("position", new Float32BufferAttribute(waterMeshData.positions, 3));
+            waterGeometry.setAttribute("normal", new Float32BufferAttribute(waterMeshData.normals, 3));
+            waterGeometry.setAttribute("uv", new Float32BufferAttribute(waterMeshData.uvs, 2));
             waterGeometry.setIndex(waterMeshData.indices);
-
-            const waterMesh = new Mesh(
-                waterGeometry,
-                this.mgr.blockTable.water.texture.side
-            );
+            const waterMesh = new Mesh(waterGeometry, this.mgr.blockTable.water.texture.side);
             this.mesh.add(waterMesh);
         }
-
         return this.mesh;
     }
 
@@ -132,7 +108,7 @@ export class Chunk {
     findSpawnLocation(objHeight = 2) {
         if (!this.isGenerated) return null;
 
-        const attempts = 100;
+        const attempts = 10;
         for (let i = 0; i < attempts; i++) {
             const x = Math.floor(Math.random() * (this.size - 2)) + 1;
             const z = Math.floor(Math.random() * (this.size - 2)) + 1;
@@ -151,16 +127,12 @@ export class Chunk {
                 }
 
                 if (hasSpace) {
-                    return [
-                        x + this.chunkX * this.size + 0.5,
-                        y + objHeight / 2,
-                        z + this.chunkZ * this.size + 0.5,
-                    ];
+                    return [x + this.chunkX * this.size + 0.5, y + objHeight / 2, z + this.chunkZ * this.size + 0.5];
                 }
             }
         }
 
-        return null;
+        return [8, 64, 8];
     }
 
     disposeCurrentMesh() {

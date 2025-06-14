@@ -1,11 +1,4 @@
-import {
-    BoxGeometry,
-    EdgesGeometry,
-    LineBasicMaterial,
-    LineSegments,
-    PerspectiveCamera,
-    Vector3,
-} from "three";
+import { BoxGeometry, EdgesGeometry, LineBasicMaterial, LineSegments, PerspectiveCamera, Vector3 } from "three";
 import { PointerLockControls } from "./PointerLockControls.js";
 import { Inventory } from "./Inventory.js";
 
@@ -19,20 +12,12 @@ class Player {
         this.inventory = new Inventory(this.mgr);
         this.zoomfov = 10;
         this.fov = 80;
-        this.camera = new PerspectiveCamera(
-            this.fov,
-            window.innerWidth / window.innerHeight,
-            0.1,
-            1000
-        );
+        this.camera = new PerspectiveCamera(this.fov, window.innerWidth / window.innerHeight, 0.1, 1000);
         this.camera.position.set(width / 2, width, width / 2);
 
         this.direction = new Vector3();
 
-        this.controls = new PointerLockControls(
-            this.camera,
-            renderer.domElement
-        );
+        this.controls = new PointerLockControls(this.camera, renderer.domElement);
         this.controls.rotateSpeed = 0.3;
         this.controls.panSpeed = 0.5;
         this.controls.zoomSpeed = 0.5;
@@ -50,7 +35,7 @@ class Player {
         this.reach = 5;
         this.velocity = new Vector3(0, 0, 0);
         this.moveSpeed = 4.3337;
-        this.flyMult = 4;
+        this.flyMult = 10;
         this.jumpForce = 7.2;
         this.isGrounded = false;
         this.gravity = 24.0;
@@ -202,11 +187,7 @@ class Player {
     }
 
     isBlockSolid(x, y, z) {
-        const blockId = this.mgr.getBlock(
-            Math.floor(x),
-            Math.floor(y),
-            Math.floor(z)
-        );
+        const blockId = this.mgr.getBlock(Math.floor(x), Math.floor(y), Math.floor(z));
         //console.log(blockId);
         return !(blockId === -1 || blockId === 5);
     }
@@ -275,12 +256,7 @@ class Player {
                     );
 
                     if (blockid !== -1) {
-                        this.mgr.setBlock(
-                            this.lookingAt.x - 0.5,
-                            this.lookingAt.y - 0.5,
-                            this.lookingAt.z - 0.5,
-                            null
-                        );
+                        this.mgr.setBlock(this.lookingAt.x - 0.5, this.lookingAt.y - 0.5, this.lookingAt.z - 0.5, null);
                         this.lastBreakTime = currentTime;
 
                         this.inventory.add(blockid === 2 ? 0 : blockid);
@@ -303,25 +279,15 @@ class Player {
 
             case 2:
                 if (currentTime - this.lastPlaceTime >= this.placeInterval) {
-                    const side = new Vector3(
-                        this.lookingAt.x,
-                        this.lookingAt.y,
-                        this.lookingAt.z
-                    )
+                    const side = new Vector3(this.lookingAt.x, this.lookingAt.y, this.lookingAt.z)
                         .addScaledVector(this.hitNormal, 1)
                         .floor();
 
                     if (this.canPlaceBlock(side.x, side.y, side.z)) {
-                        const heldItem =
-                            this.inventory.inventory[this.inventory.holding];
+                        const heldItem = this.inventory.inventory[this.inventory.holding];
 
                         if (heldItem && heldItem.count > 0) {
-                            this.mgr.setBlock(
-                                side.x,
-                                side.y,
-                                side.z,
-                                heldItem.id
-                            );
+                            this.mgr.setBlock(side.x, side.y, side.z, heldItem.id);
 
                             this.inventory.remove(this.inventory.holding);
 
@@ -346,9 +312,7 @@ class Player {
         let hitPoint = null;
 
         for (let i = 0; i <= distance; i += 0.05) {
-            const target = this.camera.position
-                .clone()
-                .addScaledVector(this.direction, i);
+            const target = this.camera.position.clone().addScaledVector(this.direction, i);
             const blockX = Math.floor(target.x);
             const blockY = Math.floor(target.y);
             const blockZ = Math.floor(target.z);
@@ -365,11 +329,7 @@ class Player {
         }
 
         if (targetBlock && hitPoint) {
-            const blockCenter = new Vector3(
-                targetBlock.x,
-                targetBlock.y,
-                targetBlock.z
-            );
+            const blockCenter = new Vector3(targetBlock.x, targetBlock.y, targetBlock.z);
             const relativeHit = hitPoint.clone().sub(blockCenter);
 
             let maxComponent = 0;
@@ -402,11 +362,7 @@ class Player {
     }
 
     isPointInSolid(x, y, z) {
-        const blockId = this.mgr.getBlock(
-            Math.floor(x),
-            Math.floor(y),
-            Math.floor(z)
-        );
+        const blockId = this.mgr.getBlock(Math.floor(x), Math.floor(y), Math.floor(z));
         return blockId !== -1 && blockId !== 5;
     }
 
@@ -487,9 +443,7 @@ class Player {
             }
         }
 
-        const finalPos = startPos
-            .clone()
-            .addScaledVector(direction, safeDistance);
+        const finalPos = startPos.clone().addScaledVector(direction, safeDistance);
 
         return {
             position: finalPos,
@@ -645,27 +599,16 @@ class Player {
                 this.controls.getDirection(forwardVector);
                 forwardVector.y = 0;
                 if (Math.abs(forwardVector.length()) < 0.01) {
-                    const sideVector = new Vector3(
-                        camera.matrix.elements[0],
-                        0,
-                        camera.matrix.elements[2]
-                    );
+                    const sideVector = new Vector3(camera.matrix.elements[0], 0, camera.matrix.elements[2]);
                     sideVector.normalize();
-                    forwardVector.crossVectors(
-                        sideVector,
-                        new Vector3(0, -1, 0)
-                    );
+                    forwardVector.crossVectors(sideVector, new Vector3(0, -1, 0));
                 }
                 forwardVector.normalize();
                 moveVector.add(forwardVector.multiplyScalar(moveZ));
             }
 
             if (moveX !== 0) {
-                const sideVector = new Vector3(
-                    -camera.matrix.elements[0],
-                    0,
-                    -camera.matrix.elements[2]
-                );
+                const sideVector = new Vector3(-camera.matrix.elements[0], 0, -camera.matrix.elements[2]);
                 sideVector.normalize();
                 moveVector.add(sideVector.multiplyScalar(moveX));
             }
@@ -673,11 +616,7 @@ class Player {
             moveVector.normalize();
             const speed =
                 this.moveSpeed *
-                (this.flying
-                    ? this.flyMult
-                    : this.movementState.sprint
-                    ? 1.5
-                    : 1) *
+                (this.flying ? this.flyMult : this.movementState.sprint ? 1.5 : 1) *
                 (inWater ? 0.5 : 1.0);
 
             moveVector.multiplyScalar(speed * delta);

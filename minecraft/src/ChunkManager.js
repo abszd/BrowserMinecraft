@@ -63,7 +63,7 @@ class ChunkManager {
 
     initializeWorkers() {
         try {
-            this.chunkWorker = new Worker(new URL("./chunkWorker.js", import.meta.url));
+            this.chunkWorker = new Worker(new URL("./chunkWorker.js", import.meta.url), { type: "module" });
             this.chunkWorker.onmessage = (e) => this.handleChunkWorkerMessage(e);
             this.chunkWorker.onerror = (error) => {
                 console.error("Chunk worker error:", error);
@@ -131,6 +131,9 @@ class ChunkManager {
         const { type, data, chunkId, error } = e.data;
 
         switch (type) {
+            case "log":
+                console.log("Worker:", data);
+                break;
             case "initialized":
                 //console.log("Chunk worker initialized");
                 this.checkWorkersReady();
@@ -159,6 +162,9 @@ class ChunkManager {
         const { type, data, error } = e.data;
 
         switch (type) {
+            case "log":
+                console.log("Worker:", data);
+                break;
             case "initialized":
                 //console.log("Mesh worker initialized");
                 this.checkWorkersReady();
@@ -234,7 +240,7 @@ class ChunkManager {
     onMeshCompleted(data) {
         const { chunkId, terrainMeshData, waterMeshData } = data;
         const chunk = this.pendingMeshes.get(chunkId);
-        //console.log(this.pendingMeshes.size);
+        //console.log(this.terrainMeshData);
         if (!chunk) {
             console.warn("Received mesh for unknown chunk:", chunkId);
             this.dirtyChunks.add(chunk);
@@ -259,7 +265,7 @@ class ChunkManager {
         const playerChunkX = Math.floor(playerX / this.chunkSize);
         const playerChunkZ = Math.floor(playerZ / this.chunkSize);
 
-        const spawnRadius = Math.max(4, this.renderDistance - 1);
+        const spawnRadius = Math.max(2, this.renderDistance - 1);
 
         for (let dx = -spawnRadius; dx <= spawnRadius; dx++) {
             for (let dz = -spawnRadius; dz <= spawnRadius; dz++) {
@@ -272,6 +278,7 @@ class ChunkManager {
 
                 if (!chunk || !chunk.isGenerated || !chunk.mesh) {
                     //console.log(dx);
+                    //console.error(chunk);
                     return false;
                 }
             }
@@ -300,7 +307,7 @@ class ChunkManager {
         const chunk = this.pendingGeneration.get(chunkId);
         if (chunk) {
             this.pendingGeneration.delete(chunkId);
-            console.warn("Error With Chunk:", chunkId);
+            //console.warn("Error With Chunk:", chunkId);
         }
     }
 
@@ -341,7 +348,7 @@ class ChunkManager {
     requestChunkGeneration(chunk) {
         const chunkId = `${chunk.chunkX},${chunk.chunkZ}`;
         if (!this.chunkWorker || !this.workersInitialized) {
-            console.warn("Error With Chunk:", chunkId);
+            //console.warn("Error With Chunk:", chunkId);
             return;
         }
 
@@ -444,7 +451,7 @@ class ChunkManager {
             if (spawn) return spawn;
         }
 
-        return null;
+        return [8, 64, 8];
     }
 
     performFrustumCulling() {

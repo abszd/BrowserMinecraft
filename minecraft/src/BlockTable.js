@@ -4,7 +4,6 @@ import { shaderMaterial } from "./shaderHelper.js";
 export function getBlockTable(loadTexture, rd, rf) {
     return {
         dirt: {
-            transparent: true,
             texture: {
                 side: shaderMaterial("shader.vs", "shader.fs", {
                     side: FrontSide,
@@ -115,7 +114,7 @@ export function getBlockTable(loadTexture, rd, rf) {
         leaf: {
             texture: {
                 side: shaderMaterial("leaf_shader.vs", "leaf_shader.fs", {
-                    side: FrontSide,
+                    side: DoubleSide,
                     transparent: true,
                     uniforms: {
                         colormap: {
@@ -174,42 +173,23 @@ export function getBlockTable(loadTexture, rd, rf) {
             buid: 1,
             name: "Slime",
         },
-        grass_top: {
+        sand: {
             texture: {
-                side: shaderMaterial("shader.vs", "leaf_shader.fs", {
+                side: shaderMaterial("shader.vs", "shader.fs", {
                     side: FrontSide,
                     uniforms: {
                         colormap: {
-                            value: loadTexture("textures/grass_top.png"),
+                            value: loadTexture("textures/sand.png"),
                         },
                         renderDistance: { value: rd },
                         renderFade: { value: rf },
                     },
                 }),
-                top: shaderMaterial("shader.vs", "leaf_shader.fs", {
-                    side: FrontSide,
-                    uniforms: {
-                        colormap: {
-                            value: loadTexture("textures/grass_top.png"),
-                        },
-                        renderDistance: { value: rd },
-                        renderFade: { value: rf },
-                    },
-                }),
-                bottom: shaderMaterial("shader.vs", "leaf_shader.fs", {
-                    side: FrontSide,
-                    uniforms: {
-                        colormap: {
-                            value: loadTexture("textures/dirt.png"),
-                        },
-                        renderDistance: { value: rd },
-                        renderFade: { value: rf },
-                    },
-                }),
+                top: null,
             },
             guid: 7,
             buid: 1,
-            name: "Grass",
+            name: "Sand",
         },
     };
 }
