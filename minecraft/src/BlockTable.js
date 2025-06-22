@@ -114,7 +114,7 @@ export function getBlockTable(loadTexture, rd, rf) {
         leaf: {
             texture: {
                 side: shaderMaterial("leaf_shader.vs", "leaf_shader.fs", {
-                    side: DoubleSide,
+                    side: FrontSide,
                     transparent: true,
                     uniforms: {
                         colormap: {
@@ -133,7 +133,7 @@ export function getBlockTable(loadTexture, rd, rf) {
         },
         water: {
             texture: {
-                side: shaderMaterial("water_shader.vs", "water_shader.fs", {
+                side: shaderMaterial("still_water_shader.vs", "still_water_shader.fs", {
                     side: DoubleSide,
                     uniforms: {
                         colormap: {

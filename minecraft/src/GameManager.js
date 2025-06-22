@@ -2,9 +2,9 @@ import { Frustum, Group, Matrix4, Box3, Vector3 } from "three";
 import { Chunk } from "./Chunk.js";
 import { MeshBuffer, TerrainBuffer } from "./BufferPool.js";
 
-class ChunkManager {
+class GameManager {
     constructor(params = {}) {
-        this.worldSeed = params.seed || 17;
+        this.worldSeed = params.seed || Math.floor(Math.random() * 999999999);
         this.chunkSize = params.chunkSize || 16;
         this.chunkHeight = params.chunkHeight || 128;
         this.renderDistance = params.renderDistance || 4;
@@ -39,8 +39,12 @@ class ChunkManager {
 
         this.terrainBuffer;
         this.meshBuffer;
-        this.workersInitialized = false;
-        this.initializeWorkerPools();
+        // this.meshPool = []; // For mesh building
+        // this.pendingGeneration = new Map(); // chunkId -> chunk (waiting for terrain)
+        // this.pendingMeshes = new Map(); // chunkId -> chunk (waiting for mesh)
+        // this.maxPoolSize = 4;
+        // this.workersInitialized = false;
+        this.initializeWorkers();
     }
 
     updateRenderDistances(distance) {
@@ -61,7 +65,7 @@ class ChunkManager {
         });
     }
 
-    initializeWorkerPools() {
+    initializeWorkers() {
         this.terrainBuffer = new TerrainBuffer(this, { maxSize: this.maxTerrainWorkers });
         this.meshBuffer = new MeshBuffer(this, { maxSize: this.maxMeshWorkers });
     }
@@ -75,115 +79,183 @@ class ChunkManager {
     }
 
     sendToWorkers() {
-        const maxTerrainWorkers = 1024;
-        const maxMeshWorkers = 1024;
+        const maxTerrainWorkers = 2;
+        const maxMeshWorkers = 2;
         let a = 0;
         let b = 0;
 
         for (const chunk of this.activeChunks) {
             if (a < maxTerrainWorkers && !chunk.isGenerated && !chunk.isGenerating) {
-                this.requestTerrain(chunk);
-                if (chunk.isGenerating === true) a++;
+                const message = {
+                    type: "generateChunk",
+                    frameno: null,
+                    chunkX: chunk.chunkX,
+                    chunkZ: chunk.chunkZ,
+                };
+
+                if (this.terrainBuffer.add(chunk, message)) {
+                    chunk.isGenerating = true;
+                    a++;
+                }
             } else if (b < maxMeshWorkers && chunk.isGenerated && !chunk.isBuildingMesh && !chunk.mesh) {
-                this.requestMesh(chunk);
-                if (chunk.isBuildingMesh) b++;
+                const message = {
+                    type: "buildMesh",
+                    frameno: null,
+                    data: {
+                        chunkData: {
+                            grid: Array.from(chunk.grid.entries()),
+                            size: chunk.size,
+                            height: chunk.height,
+                            chunkX: chunk.chunkX,
+                            chunkZ: chunk.chunkZ,
+                        },
+                    },
+                };
+
+                if (this.meshBuffer.add(chunk, message)) {
+                    chunk.isBuildingMesh = true;
+                    b++;
+                }
             }
-            if (a >= maxTerrainWorkers && b >= maxMeshWorkers) break;
+            if (a < maxTerrainWorkers && b < maxMeshWorkers) break;
         }
     }
 
+    handleChunkWorkerMessage(e) {
+        const { type, data, chunkId, error } = e.data;
+
+        switch (type) {
+            case "log":
+                console.log("Worker:", data);
+                break;
+            case "initialized":
+                //console.log("Chunk worker initialized");
+                this.checkWorkersReady();
+                break;
+
+            case "chunkGenerated":
+                this.onChunkGenerated(data);
+                break;
+
+            case "chunkUpdated":
+                this.onChunkUpdated(data);
+                break;
+
+            case "spawnFound":
+                this.onSpawnFound(chunkId, data.location);
+                break;
+
+            case "error":
+                console.error("Chunk worker error:", error);
+                this.handleGenerationError(chunkId);
+                break;
+        }
+    }
+
+    handleMeshWorkerMessage(e) {
+        const { type, data, error } = e.data;
+
+        switch (type) {
+            case "log":
+                console.log("Worker:", data);
+                break;
+            case "initialized":
+                //console.log("Mesh worker initialized");
+                this.checkWorkersReady();
+                break;
+
+            case "meshCompleted":
+                this.onMeshCompleted(data);
+                break;
+
+            case "error":
+                console.error("Mesh worker error:", error);
+                break;
+        }
+    }
     checkWorkersReady() {
-        if (this.terrainBuffer?.atLeastOneWorker && this.meshBuffer.atLeastOneWorker && !this.workersInitialized) {
+        if (this.chunkWorker && this.meshWorker && !this.workersInitialized) {
             this.workersInitialized = true;
-        }
 
-        //console.log("Both workers ready!");
+            this.chunks.forEach((chunk) => {
+                if (!chunk.isGenerating && !chunk.isGenerated) {
+                    this.requestChunkGeneration(chunk);
+                }
+            });
+
+            //console.log("Both workers ready!");
+        }
+    }
+    onTerrainComplete(data) {
+        const { chunkId, chunkX, chunkZ, frameno } = data;
+        cont;
     }
 
-    onTerrainCompleted(data) {
-        const { chunkId, chunkX, chunkZ, frameno } = data;
-        //console.log("Terrain for", chunkId, this.terrainBuffer.pool[frameno]);
-        const chunk = this.terrainBuffer.pool[frameno].chunk;
+    onChunkGenerated(chunkData) {
+        const { chunkId, chunkX, chunkZ } = chunkData;
+        const chunk = this.pendingGeneration.get(chunkId);
 
         if (!chunk) {
             console.warn("Received terrain for unknown chunk:", chunkId);
             return;
         }
-        chunk.setChunkData(data);
-        this.requestMesh(chunk);
-        this.pokeWorkers();
-        //console.log("terrain", data);
-    }
 
-    pokeWorkers() {
-        this.terrainBuffer.updateWorkers();
-        this.meshBuffer.updateWorkers();
-        //console.log("Mesh Buffer", this.meshBuffer.pool);
-    }
-    requestTerrain(chunk) {
-        //console.log("Requesting terrain", chunk.chunkX, chunk.chunkZ);
-        if (
-            this.terrainBuffer.add(chunk, {
-                type: "generateChunk",
-                frameno: null,
-                chunkX: chunk.chunkX,
-                chunkZ: chunk.chunkZ,
-            })
-        )
-            chunk.isGenerating = true;
+        this.pendingGeneration.delete(chunkId);
+
+        chunk.setChunkData(chunkData);
+
+        this.requestMesh(chunk, chunkData);
     }
 
     requestMesh(chunk) {
-        //console.log("Requesting mesh", chunk.chunkX, chunk.chunkZ);
-        if (
-            this.meshBuffer.add(chunk, {
-                type: "buildMesh",
-                data: {
-                    chunkData: {
-                        grid: Array.from(chunk.grid.entries()),
-                        size: chunk.size,
-                        height: chunk.height,
-                        chunkX: chunk.chunkX,
-                        chunkZ: chunk.chunkZ,
-                    },
-                    //waterBlocks: chunk.waterBlocks,
+        if (!this.meshWorker) {
+            return;
+        }
+
+        const chunkId = `${chunk.chunkX},${chunk.chunkZ}`;
+        // console.log(
+        //     `Requesting mesh ${chunkId}, pending: ${this.pendingMeshes.has(
+        //         chunkId
+        //     )}`
+        // );
+        this.pendingMeshes.set(chunkId, chunk);
+
+        this.meshBuffer.add(chunk, {
+            type: "buildMesh",
+            data: {
+                chunkData: {
+                    grid: Array.from(chunk.grid.entries()),
+                    size: chunk.size,
+                    height: chunk.height,
+                    chunkX: chunk.chunkX,
+                    chunkZ: chunk.chunkZ,
                 },
-            })
-        )
-            chunk.isBuildingMesh = true;
+                //waterBlocks: chunk.waterBlocks,
+            },
+        });
     }
 
     onMeshCompleted(data) {
         //, waterMeshData
-        const { chunkId, terrainMeshData, frameno } = data;
-
-        const chunk = this.meshBuffer.pool[frameno].chunk;
-        //console.log("Mesh Data", data, this.meshBuffer.pool[frameno]);
-
+        const { chunkId, terrainMeshData } = data;
+        const chunk = this.pendingMeshes.get(chunkId);
         //console.log(this.terrainMeshData);
         if (!chunk) {
             console.warn("Received mesh for unknown chunk:", chunkId);
+            this.dirtyChunks.add(chunk);
             return;
         }
 
+        this.pendingMeshes.delete(chunkId);
         if (chunk.mesh) {
             this.chunkGroup.remove(chunk.mesh);
         }
         chunk.onMeshCompleted(terrainMeshData); //, waterMeshData);
         this.addChunkToScene(chunk);
-        this.pokeWorkers();
     }
 
-    onChunkUpdated(data) {
-        const chunk = this.terrainBuffer.pool[data.frameno].chunk;
-        if (chunk) {
-            chunk.updateFromWorker(data);
-            if (this.activeChunks.has(chunk)) this.dirtyChunks.add(chunk);
-        }
-    }
     addChunkToScene(chunk) {
         if (this.activeChunks.has(chunk) && chunk.mesh) {
-            //console.log("Adding chunk to scene", chunk.chunkX, chunk.chunkZ);
             this.chunkGroup.add(chunk.mesh);
         }
     }
@@ -204,14 +276,38 @@ class ChunkManager {
                 const chunk = this.getChunk(chunkX, chunkZ, false);
 
                 if (!chunk || !chunk.isGenerated || !chunk.mesh) {
-                    //console.log(dx, dz, !chunk.isGenerated, !chunk.mesh);
-                    //console.log(chunk);
+                    //console.log(dx);
+                    //console.error(chunk);
                     return false;
                 }
             }
         }
 
         return true;
+    }
+
+    onChunkUpdated(chunkData) {
+        const chunk = this.chunks.get(chunkData.chunkId);
+        //console.log(chunk);
+        if (chunk) {
+            // if (chunkData.waterBlocks) {
+            //     chunk.waterBlocks = chunkData.waterBlocks;
+            // }
+            chunk.updateFromWorker(chunkData);
+
+            if (this.activeChunks.has(chunk)) {
+                this.dirtyChunks.add(chunk);
+                //this.requestMesh(chunk, chunkData);
+            }
+        }
+    }
+
+    handleGenerationError(chunkId) {
+        const chunk = this.pendingGeneration.get(chunkId);
+        if (chunk) {
+            this.pendingGeneration.delete(chunkId);
+            //console.warn("Error With Chunk:", chunkId);
+        }
     }
 
     worldToChunkCoords(x, y, z) {
@@ -277,7 +373,6 @@ class ChunkManager {
         const chunkId = `${chunkX},${chunkZ}`;
 
         if (!chunk.isGenerated) {
-            console.log(`chunk ${chunkId} not generated yet!`);
             return;
         }
 
@@ -302,15 +397,17 @@ class ChunkManager {
             }
         }
 
-        if (blockType === null) {
-            chunk.grid.delete(`${localX} ${localY} ${localZ}`);
-        } else {
-            chunk.grid.set(`${localX} ${localY} ${localZ}`, blockType);
-            if (!this.TRANSPARENT_BLOCKS.has(blockType) && chunk.grid.get(`${localX} ${localY - 1} ${localZ}`) === 2) {
-                chunk.grid.set(`${localX} ${localY - 1} ${localZ}`, 0);
-            }
+        if (this.chunkWorker && this.workersInitialized) {
+            this.chunkWorker.postMessage({
+                type: "updateBlock",
+                chunkId: chunkId,
+                x: localX,
+                y: localY,
+                z: localZ,
+                blockType: blockType,
+                //updateWaterMesh: adjacentChunks.size > 0,
+            });
         }
-        this.dirtyChunks.add(chunk);
 
         for (const adjChunk of adjacentChunks) {
             this.dirtyChunks.add(adjChunk);
@@ -407,12 +504,8 @@ class ChunkManager {
         }
 
         this.activeChunks = newActiveChunks;
-
-        this.sendToWorkers();
-
-        this.pokeWorkers();
         this.enforceChunkLimit();
-
+        this.sendToWorkers();
         this.updateDirtyChunks();
         if (this.camera) {
             this.cameraMatrix.multiplyMatrices(this.camera.projectionMatrix, this.camera.matrixWorldInverse);
@@ -466,7 +559,7 @@ class ChunkManager {
             .sort((a, b) => a.lastAccessed - b.lastAccessed);
 
         const toRemove = sortedChunks.slice(0, this.chunks.size - this.maxLoadedChunks);
-        //console.log(this.chunkGroup.children.length);
+
         for (const chunk of toRemove) {
             this.unloadChunk(chunk);
         }
@@ -477,16 +570,16 @@ class ChunkManager {
             return;
         }
         const key = `${chunk.chunkX},${chunk.chunkZ}`;
-        //console.log(`unloading ${key}`);
-        //console.log(this.terrainBuffer);
-        delete this.terrainBuffer.pending[key];
-        delete this.meshBuffer.pending[key];
 
-        this.terrainBuffer.searchAndDestroyChunk(key);
-        // this.terrainBuffer.add(chunk, {
-        //     type: "unloadChunk",
-        //     chunkId: key,
-        // });
+        this.pendingGeneration.delete(key);
+        this.pendingMeshes.delete(key);
+
+        if (this.chunkWorker) {
+            this.chunkWorker.postMessage({
+                type: "unloadChunk",
+                chunkId: key,
+            });
+        }
 
         if (chunk.mesh) {
             chunk.disposeCurrentMesh();
@@ -496,6 +589,16 @@ class ChunkManager {
     }
 
     dispose() {
+        if (this.chunkWorker) {
+            this.chunkWorker.terminate();
+            this.chunkWorker = null;
+        }
+
+        if (this.meshWorker) {
+            this.meshWorker.terminate();
+            this.meshWorker = null;
+        }
+
         for (const chunk of this.chunks.values()) {
             chunk.disposeCurrentMesh();
         }
@@ -507,4 +610,4 @@ class ChunkManager {
     }
 }
 
-export { ChunkManager };
+export { GameManager };

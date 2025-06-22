@@ -8,20 +8,9 @@ function workerLog(...args) {
 }
 class ChunkWorker {
     constructor() {
-        this.chunks = new Map();
         this.blockTable = null;
         this.worldSeed = 69420;
         this._globalPerm = null;
-        this.continentalSpline = new SplineCurve([
-            new Vector2(0, 0.01),
-            new Vector2(0.1, 0.1),
-            new Vector2(0.25, 0.1),
-            new Vector2(0.5, 0.3),
-            new Vector2(0.65, 0.4),
-            new Vector2(0.7, 0.6),
-            new Vector2(0.8, 0.85),
-            new Vector2(1, 0.5),
-        ]);
     }
 
     initialize(params) {
@@ -38,10 +27,9 @@ class ChunkWorker {
 
         chunk.generateTerrain();
         chunk.createTrees();
-        chunk.buildLakes();
+        //chunk.buildLakes();
 
         const chunkId = `${chunkX},${chunkZ}`;
-        this.chunks.set(chunkId, chunk);
 
         return {
             chunkId: chunkId,
@@ -55,36 +43,9 @@ class ChunkWorker {
         };
     }
 
-    updateBlock(chunkId, x, y, z, blockType, updateWaterMesh = false) {
-        const chunk = this.chunks.get(chunkId);
-        if (!chunk) return null;
-
-        chunk.setBlock(x, y, z, blockType);
-
-        if (updateWaterMesh) {
-            chunk.buildLakes();
-        }
-
-        return {
-            chunkId: chunkId,
-            grid: Array.from(chunk.grid.entries()),
-            waterBlocks: chunk.waterBlocks,
-            lastAccessed: chunk.lastAccessed,
-        };
-    }
-
-    getBlock(chunkId, x, y, z) {
-        const chunk = this.chunks.get(chunkId);
-        return chunk ? chunk.getBlock(x, y, z) : -1;
-    }
-
     findSpawnLocation(chunkId, objHeight = 2) {
         const chunk = this.chunks.get(chunkId);
         return chunk ? chunk.findSpawnLocation(objHeight) : null;
-    }
-
-    unloadChunk(chunkId) {
-        this.chunks.delete(chunkId);
     }
 
     generatePermTable(seed) {
@@ -114,23 +75,29 @@ class WorkerChunk {
         this.grid = new Map();
         this.waterBlocks = [];
         this.lastAccessed = Date.now();
-        this.waterLevel = Math.floor(this.worker.amplitude / 3);
+        this.waterLevel = Math.floor(this.worker.amplitude / 4);
         this.TRANSPARENT_BLOCKS = new Set([-1, 4, 5]);
-        this.CSpline = new SplineCurve([new Vector2(0, 0), new Vector2(0.75, 0.25), new Vector2(1, 1)]);
+        this.CSpline = new SplineCurve([
+            new Vector2(0, 0),
+            new Vector2(0.75, 0.25),
+            // new Vector2(0.9, 0.6),
+            new Vector2(1, 1),
+        ]);
         this.MVSpline = new SplineCurve([
             new Vector2(0, 0.1),
             new Vector2(0.1, 0.2),
-            new Vector2(0.2, 0.6),
-            new Vector2(0.4, 0.2),
-            new Vector2(0.5, 1),
-            new Vector2(0.75, 0.6),
-            new Vector2(1, 0.6),
+            new Vector2(0.12, 0.4),
+            new Vector2(0.4, 0.4),
+            new Vector2(0.401, 1),
+            new Vector2(0.6, 0.6),
+            new Vector2(1, 0.1),
         ]);
         this.PVSpline = new SplineCurve([
             new Vector2(0, 0.0),
-            new Vector2(0.43, 0.2),
-            new Vector2(0.8, 1),
-            new Vector2(0.83, 0.7),
+            new Vector2(0.43, 0.1),
+            new Vector2(0.82, 0.2),
+            new Vector2(0.9, 0.9),
+            new Vector2(0.93, 1),
             new Vector2(1, 0.7),
         ]);
     }
@@ -138,7 +105,7 @@ class WorkerChunk {
     generateTerrain() {
         const heightCache = new Map();
         //workerLog(this.worker.amplitude, this.waterLevel);
-        const stoneSlope = 2.5;
+        const stoneSlope = 2;
         const dirtSlope = 1.5;
 
         for (let localX = -1; localX <= this.size; localX++) {
@@ -149,6 +116,7 @@ class WorkerChunk {
             }
         }
 
+        const blockSet = [];
         for (let localX = 0; localX < this.size; localX++) {
             for (let localZ = 0; localZ < this.size; localZ++) {
                 const height = heightCache.get(`${localX},${localZ}`);
@@ -162,10 +130,12 @@ class WorkerChunk {
 
                 const slope = (gradientX + gradientZ) / 2;
 
-                for (let y = 0; y < height; y++) {
+                for (let y = 0; y < Math.max(this.waterLevel, height); y++) {
                     let blockType;
-                    if (y < height - 4) {
-                        blockType = 1; // Stone (deep)
+                    if (y > height) {
+                        blockType = 5;
+                    } else if (y < height - 4) {
+                        blockType = 1;
                     } else if (y - this.waterLevel <= 1) {
                         blockType = 7;
                     } else if (y < height - 1) {
@@ -184,17 +154,19 @@ class WorkerChunk {
                         }
                         //if (Math.pow(y / this.worker.amplitude, 4) > Math.random()) blockType = 0;
                     }
-                    this.setBlock(localX, y, localZ, blockType);
+                    blockSet.push([`${localX} ${y} ${localZ}`, blockType]);
+                    //this.setBlock(localX, y, localZ, blockType);
                 }
             }
         }
+        this.grid = new Map(blockSet);
     }
 
     generateHeightAt(worldX, worldZ) {
-        const baseFreq = 0.003;
-        let continentalNoise = this.getNoise(3, baseFreq, 0.5, worldX, worldZ);
-        let mountainValleyNoise = this.getNoise(3, baseFreq * 2, 0.5, worldX, worldZ);
-        let peakNoise = this.getNoise(3, 0.03, 0.5, worldX, worldZ);
+        const baseFreq = 0.002;
+        let continentalNoise = this.getNoise(1, baseFreq, 0.5, worldX, worldZ);
+        let mountainValleyNoise = this.getNoise(2, baseFreq * 2, 0.5, worldX, worldZ);
+        let peakNoise = this.getNoise(3, 0.02, 0.5, worldX, worldZ);
 
         const cHeight = this.CSpline.getPoint(continentalNoise).y;
         const mvHeight = this.MVSpline.getPoint(mountainValleyNoise).y;
@@ -203,9 +175,10 @@ class WorkerChunk {
         const base = cHeight;
         const mountain = base + mvHeight * cHeight;
         const peaks = mountain + pvHeight * mvHeight * cHeight;
-        const final = peaks * this.worker.amplitude;
+        //console.log(peaks);
+        const final = this.worker.amplitude * (peaks / 1.5); //* this.worker.amplitude;
 
-        return Math.min(this.worker.chunkHeight, final);
+        return Math.min(this.worker.chunkHeight - 8, final);
     }
 
     getNoise(octaves, freq, amplitudeDif, worldX, worldZ) {
@@ -255,7 +228,7 @@ class WorkerChunk {
         const z_frac = z - Math.floor(z);
         const u = fade(x_frac);
         const v = fade(z_frac);
-
+        //workerLog(u, v);
         const A = this._perm[X] + Z;
         const B = this._perm[X + 1] + Z;
         const AA = this._perm[A];
@@ -268,9 +241,10 @@ class WorkerChunk {
         const g3 = grad(this._perm[AB], x_frac, z_frac - 1);
         const g4 = grad(this._perm[BB], x_frac - 1, z_frac - 1);
 
-        const x1 = lerp(g1, g2, u);
-        const x2 = lerp(g3, g4, u);
-        return lerp(x1, x2, v);
+        const x1 = g1 + u * (g2 - g1);
+        const x2 = g3 + u * (g4 - g3);
+        //workerLog(x1, x2);
+        return x1 + v * (x2 - x1);
     }
 
     createTrees() {
@@ -292,14 +266,14 @@ class WorkerChunk {
     }
 
     buildTree(x, y, z) {
-        const treeHeight = 5 + Math.floor(Math.random() * 4);
+        const treeHeight = 4 + Math.floor(Math.random() * 4);
 
         for (let i = 1; i <= treeHeight; i++) {
             if (y + i >= this.height) break;
             this.setBlock(x, y + i, z, 3);
         }
 
-        const leafStart = Math.max(3, treeHeight - 3);
+        const leafStart = Math.max(2, treeHeight - 3);
         const leafTop = treeHeight + 1;
 
         for (let ly = leafStart; ly <= leafTop; ly++) {
@@ -331,7 +305,7 @@ class WorkerChunk {
     }
 
     buildLakes() {
-        this.waterBlocks = [];
+        //this.waterBlocks = [];
 
         for (let x = 0; x < this.size; x++) {
             for (let z = 0; z < this.size; z++) {
@@ -339,14 +313,14 @@ class WorkerChunk {
                     const blockId = this.getBlock(x, y, z);
                     if (blockId === 5) {
                         const blockAbove = this.getBlock(x, y + 1, z);
-                        const isTopWater = blockAbove !== 5;
+                        //const isTopWater = blockAbove !== 5;
 
-                        this.waterBlocks.push({ x, y, z, isTopWater });
+                        //this.waterBlocks.push({ x, y, z, isTopWater });
                     }
                     if (y >= 3 && y <= this.waterLevel && blockId === -1) {
                         this.setBlock(x, y, z, 5);
-                        const isTopWater = y === this.waterLevel;
-                        this.waterBlocks.push({ x, y, z, isTopWater });
+                        //const isTopWater = y === this.waterLevel;
+                        //this.waterBlocks.push({ x, y, z, isTopWater });
                     }
                 }
             }
@@ -415,7 +389,7 @@ class WorkerChunk {
 const chunkWorker = new ChunkWorker();
 
 self.onmessage = function (e) {
-    const { type, chunkX, chunkZ, params, chunkId, x, y, z, blockType, objHeight } = e.data;
+    const { type, chunkX, chunkZ, params, chunkId, x, y, z, blockType, objHeight, frameno } = e.data;
 
     try {
         switch (type) {
@@ -423,12 +397,14 @@ self.onmessage = function (e) {
                 chunkWorker.initialize(params);
                 self.postMessage({
                     type: "initialized",
+                    frameno: frameno,
                     success: true,
                 });
                 break;
 
             case "generateChunk":
                 const chunkData = chunkWorker.generateChunk(chunkX, chunkZ);
+                chunkData.frameno = frameno;
                 self.postMessage({
                     type: "chunkGenerated",
                     data: chunkData,
@@ -437,6 +413,7 @@ self.onmessage = function (e) {
 
             case "updateBlock":
                 const updatedData = chunkWorker.updateBlock(chunkId, x, y, z, blockType, e.data.updateWaterMesh);
+                updatedData.frameno = frameno;
                 if (updatedData) {
                     self.postMessage({
                         type: "chunkUpdated",
@@ -451,6 +428,7 @@ self.onmessage = function (e) {
                     type: "blockResult",
                     chunkId: chunkId,
                     blockId: blockId,
+                    frameno: frameno,
                 });
                 break;
 
@@ -460,6 +438,7 @@ self.onmessage = function (e) {
                     type: "spawnFound",
                     chunkId: chunkId,
                     location: spawnLocation,
+                    frameno: frameno,
                 });
                 break;
 
@@ -468,6 +447,7 @@ self.onmessage = function (e) {
                 self.postMessage({
                     type: "chunkUnloaded",
                     chunkId: chunkId,
+                    frameno: frameno,
                 });
                 break;
 
@@ -480,6 +460,7 @@ self.onmessage = function (e) {
             chunkId: chunkId,
             error: error.message,
             stack: error.stack,
+            frameno: frameno,
         });
     }
 };

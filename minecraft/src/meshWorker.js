@@ -9,6 +9,7 @@ class MeshWorker {
         this.TRANSPARENT_BLOCKS = new Set([-1, 4, 5]); // Air, Water, Leaves
         this.blockTable = null;
         this.idBlockTypeLookup = {};
+        this.waterInset = 0.2;
     }
 
     initialize(blockTableData, transparentBlocks) {
@@ -39,28 +40,30 @@ class MeshWorker {
                     let blockId = chunkGrid.get(`${x} ${y} ${z}`);
 
                     const idx = y * size + z;
-                    if (blockId !== undefined && blockId !== 5) {
+                    if (blockId !== undefined) {
                         found = true;
-                        let neighbor = chunkGrid.get(`${x + 1} ${y} ${z}`) ?? -1;
+                        let neighbor =
+                            x === size - 1 ? (blockId === 5 ? 0 : -1) : chunkGrid.get(`${x + 1} ${y} ${z}`) ?? -1;
                         if (this.TRANSPARENT_BLOCKS.has(neighbor) && blockId !== neighbor) {
                             maskE[idx] = blockId + 1;
                         }
 
-                        neighbor = chunkGrid.get(`${x - 1} ${y} ${z}`) ?? -1;
+                        neighbor = x === 0 ? (blockId === 5 ? 0 : -1) : chunkGrid.get(`${x - 1} ${y} ${z}`) ?? -1;
                         if (this.TRANSPARENT_BLOCKS.has(neighbor) && blockId !== neighbor) {
                             maskW[idx] = blockId + 1;
                         }
                     }
 
                     blockId = chunkGrid.get(`${z} ${y} ${x}`);
-                    if (blockId !== undefined && blockId !== 5) {
+                    if (blockId !== undefined) {
                         found = true;
-                        let neighbor = chunkGrid.get(`${z} ${y} ${x + 1}`) ?? -1;
+                        let neighbor =
+                            x === size - 1 ? (blockId === 5 ? 0 : -1) : chunkGrid.get(`${z} ${y} ${x + 1}`) ?? -1;
                         if (this.TRANSPARENT_BLOCKS.has(neighbor) && blockId !== neighbor) {
                             maskN[idx] = blockId + 1;
                         }
 
-                        neighbor = chunkGrid.get(`${z} ${y} ${x - 1}`) ?? -1;
+                        neighbor = x === 0 ? (blockId === 5 ? 0 : -1) : chunkGrid.get(`${z} ${y} ${x - 1}`) ?? -1;
                         if (this.TRANSPARENT_BLOCKS.has(neighbor) && blockId !== neighbor) {
                             maskS[idx] = blockId + 1;
                         }
@@ -85,7 +88,7 @@ class MeshWorker {
                     const idx = x * size + z;
                     const blockId = chunkGrid.get(`${x} ${y} ${z}`);
 
-                    if (blockId !== undefined && blockId !== 5) {
+                    if (blockId !== undefined) {
                         found = true;
                         let neighbor = chunkGrid.get(`${x} ${y + 1} ${z}`) ?? -1;
                         if (this.TRANSPARENT_BLOCKS.has(neighbor) && blockId !== neighbor) {
@@ -154,7 +157,7 @@ class MeshWorker {
     createRect(blockType, m, x1, x2, y1, y2, axis, pos, dir, worldOffsetX = 0, worldOffsetZ = 0) {
         let vertices, normal, uvs;
         const width = x2 - x1;
-        const height = y2 - y1;
+        const height = y2 - y1 - (blockType === "water" && dir === 0 ? this.waterInset : 0);
 
         let face = "side";
         if (axis === 1) {
@@ -198,7 +201,10 @@ class MeshWorker {
             uvs = [0, 0, width, 0, width, height, 0, height];
         } else if (axis === 1) {
             // Y-axis
-            const y = pos + 1 - dir;
+            if (blockType === "water") {
+                //workerLog(pos + 1 - dir - 1 - (blockType === "water" && dir === 0 ? this.waterInset : 0));
+            }
+            const y = pos + 1 - dir - (blockType === "water" && dir === 0 ? this.waterInset : 0);
             vertices =
                 dir == 1
                     ? [
@@ -411,13 +417,13 @@ class MeshWorker {
 const meshWorker = new MeshWorker();
 
 self.onmessage = function (e) {
-    const { type, data } = e.data;
+    const { type, frameno, data } = e.data;
 
     try {
         switch (type) {
             case "initialize":
                 meshWorker.initialize(data.blockTable, data.transparentBlocks);
-                self.postMessage({ type: "initialized", success: true });
+                self.postMessage({ type: "initialized", frameno: frameno, success: true });
                 break;
 
             case "buildMesh":
@@ -429,13 +435,13 @@ self.onmessage = function (e) {
                     waterBlocks && waterBlocks.length > 0
                         ? meshWorker.buildWaterMesh(waterBlocks, chunkData.chunkX, chunkData.chunkZ, chunkData.size)
                         : null;
-
                 self.postMessage({
                     type: "meshCompleted",
                     data: {
                         chunkId: `${chunkData.chunkX},${chunkData.chunkZ}`,
                         terrainMeshData: terrainMeshData,
                         waterMeshData: waterMeshData,
+                        frameno: frameno,
                     },
                 });
                 break;

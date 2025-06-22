@@ -52,7 +52,7 @@ document.body.appendChild(renderer.domElement);
 const scene = new Scene();
 
 const chunkSize = 16;
-const renderDistance = 4;
+const renderDistance = 10;
 const renderFade = Math.min(renderDistance / 8, 1);
 const worldSeed = 173869420;
 
@@ -186,7 +186,6 @@ function animate() {
     blockTable.water.texture.side.uniforms.time.value += delta * 0.5;
 
     chunkManager.updateChunks(player.camera.position.x, player.camera.position.z);
-
     renderer.render(scene, player.camera);
     stats.end();
 }

@@ -21,7 +21,7 @@ export class Chunk {
 
     setChunkData(workerData) {
         this.grid = new Map(workerData.grid);
-        this.waterBlocks = workerData.waterBlocks || [];
+        //this.waterBlocks = workerData.waterBlocks || [];
         this.lastAccessed = workerData.lastAccessed;
         this.isGenerated = true;
         this.isGenerating = false;
@@ -65,17 +65,18 @@ export class Chunk {
                 this.mesh.add(mesh);
             }
         }
+        this.update();
         //console.log(this.mesh);
 
-        if (waterMeshData && waterMeshData.positions.length > 0) {
-            const waterGeometry = new BufferGeometry();
-            waterGeometry.setAttribute("position", new Float32BufferAttribute(waterMeshData.positions, 3));
-            waterGeometry.setAttribute("normal", new Float32BufferAttribute(waterMeshData.normals, 3));
-            waterGeometry.setAttribute("uv", new Float32BufferAttribute(waterMeshData.uvs, 2));
-            waterGeometry.setIndex(waterMeshData.indices);
-            const waterMesh = new Mesh(waterGeometry, this.mgr.blockTable.water.texture.side);
-            this.mesh.add(waterMesh);
-        }
+        // if (waterMeshData && waterMeshData.positions.length > 0) {
+        //     const waterGeometry = new BufferGeometry();
+        //     waterGeometry.setAttribute("position", new Float32BufferAttribute(waterMeshData.positions, 3));
+        //     waterGeometry.setAttribute("normal", new Float32BufferAttribute(waterMeshData.normals, 3));
+        //     waterGeometry.setAttribute("uv", new Float32BufferAttribute(waterMeshData.uvs, 2));
+        //     waterGeometry.setIndex(waterMeshData.indices);
+        //     const waterMesh = new Mesh(waterGeometry, this.mgr.blockTable.water.texture.side);
+        //     this.mesh.add(waterMesh);
+        // }
         return this.mesh;
     }
 
