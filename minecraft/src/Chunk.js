@@ -50,18 +50,22 @@ export class Chunk {
                 if (meshes[i][1].positions.length === 0) return;
                 const [blockType, face = "side"] = meshes[i][0].split("-");
 
-                const material = this.getBlockMaterial(blockType, face);
-                if (!material) {
-                    console.warn(`No material found for blockType: ${blockType}, face: ${face}`);
-                    continue; // Skip this mesh if no material
-                }
-
                 const geometry = new BufferGeometry();
                 geometry.setAttribute("position", new Float32BufferAttribute(meshes[i][1].positions, 3));
                 geometry.setAttribute("normal", new Float32BufferAttribute(meshes[i][1].normals, 3));
                 geometry.setAttribute("uv", new Float32BufferAttribute(meshes[i][1].uvs, 2));
                 geometry.setIndex(meshes[i][1].indices);
-                const mesh = new Mesh(geometry, material);
+
+                let toUse;
+                if (blockType == "water" || blockType == "leaf") {
+                    toUse = this.getBlockMaterial(blockType, face);
+                } else {
+                    let depth = this.mgr.textureArray.getTextureDepth(blockType, face);
+                    const textureLayer = Array(meshes[i][1].positions.length / 3).fill(depth);
+                    geometry.setAttribute("depth", new Float32BufferAttribute(textureLayer, 1));
+                    toUse = this.mgr.textureArray.material;
+                }
+                const mesh = new Mesh(geometry, toUse);
                 this.mesh.add(mesh);
             }
         }

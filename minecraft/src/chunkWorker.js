@@ -79,6 +79,9 @@ class WorkerChunk {
         this.TRANSPARENT_BLOCKS = new Set([-1, 4, 5]);
         this.CSpline = new SplineCurve([
             new Vector2(0, 0),
+            // new Vector2(0.2, 0.55),
+            // new Vector2(0.4, 0.5),
+            // new Vector2(0.41, 0.25),
             new Vector2(0.75, 0.25),
             // new Vector2(0.9, 0.6),
             new Vector2(1, 1),
@@ -88,14 +91,14 @@ class WorkerChunk {
             new Vector2(0.1, 0.2),
             new Vector2(0.12, 0.4),
             new Vector2(0.4, 0.4),
-            new Vector2(0.401, 1),
+            new Vector2(0.41, 1),
             new Vector2(0.6, 0.6),
             new Vector2(1, 0.1),
         ]);
         this.PVSpline = new SplineCurve([
             new Vector2(0, 0.0),
             new Vector2(0.43, 0.1),
-            new Vector2(0.82, 0.2),
+            new Vector2(0.82, 0.4),
             new Vector2(0.9, 0.9),
             new Vector2(0.93, 1),
             new Vector2(1, 0.7),
@@ -173,10 +176,10 @@ class WorkerChunk {
         const pvHeight = this.PVSpline.getPoint(peakNoise).y;
 
         const base = cHeight;
-        const mountain = base + mvHeight * cHeight;
+        const mountain = base + 2 * mvHeight * cHeight;
         const peaks = mountain + pvHeight * mvHeight * cHeight;
         //console.log(peaks);
-        const final = this.worker.amplitude * (peaks / 1.5); //* this.worker.amplitude;
+        const final = this.worker.amplitude * (peaks / 2); //* this.worker.amplitude;
 
         return Math.min(this.worker.chunkHeight - 8, final);
     }
@@ -438,15 +441,6 @@ self.onmessage = function (e) {
                     type: "spawnFound",
                     chunkId: chunkId,
                     location: spawnLocation,
-                    frameno: frameno,
-                });
-                break;
-
-            case "unloadChunk":
-                chunkWorker.unloadChunk(chunkId);
-                self.postMessage({
-                    type: "chunkUnloaded",
-                    chunkId: chunkId,
                     frameno: frameno,
                 });
                 break;

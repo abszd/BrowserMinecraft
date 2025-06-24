@@ -14,6 +14,7 @@ import {
 import { Player } from "./Player.js";
 import { Debug } from "./Debug.js";
 import Stats from "stats.js";
+import { TextureArray } from "./TextureArray.js";
 const stats = new Stats();
 stats.showPanel(1);
 //stats.dom.style.cssText = "position:absolute;bottom:10px;right:10px;";
@@ -83,6 +84,7 @@ scene.environment = env_img;
 scene.background = bkg_img;
 
 const blockTable = getBlockTable(loadTexture, 0, renderFade * chunkSize);
+const textureArray = new TextureArray(renderer, textureLoader, { size: 16, rd: renderDistance, rf: renderFade });
 
 const chunkManager = new ChunkManager({
     scene: scene,
@@ -91,9 +93,11 @@ const chunkManager = new ChunkManager({
     renderDistance: renderDistance,
     blockTable: blockTable,
     amplitude: 64,
+    textureArray: textureArray,
     //seed: worldSeed,
 });
 const debug = new Debug(chunkManager);
+console.log("WebGL Version:", renderer.getContext().getParameter(renderer.getContext().VERSION));
 
 blockTable.water.texture.side.uniforms.envMap.value = scene.environment;
 blockTable.leaf.texture.side.uniforms.time.value = 0;

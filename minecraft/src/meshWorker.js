@@ -12,8 +12,9 @@ class MeshWorker {
         this.waterInset = 0.2;
     }
 
-    initialize(blockTableData, transparentBlocks) {
+    initialize(blockTableData, transparentBlocks, atlasUVs) {
         this.blockTable = blockTableData;
+        this.atlasUVs = atlasUVs;
         this.TRANSPARENT_BLOCKS = new Set(transparentBlocks);
         this.idBlockTypeLookup = {};
         Object.entries(blockTableData).forEach(([key, value]) => {

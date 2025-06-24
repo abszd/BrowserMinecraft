@@ -140,11 +140,6 @@ export class TerrainBuffer extends BufferPool {
         super.flushFrame(frameno);
     }
 
-    searchAndDestroyChunk(chunkId) {
-        for (let i = 0; i < this.maxSize; i++) {
-            this.pool[i].worker.postMessage({ type: "unloadChunk", chunkId: chunkId });
-        }
-    }
     handleWorkerResponse(d) {
         const { type, data, chunkId, error, frameno } = d;
         //console.log("terrain response - ", type);

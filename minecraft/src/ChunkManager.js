@@ -20,7 +20,7 @@ class ChunkManager {
         };
 
         this.TRANSPARENT_BLOCKS = new Set([-1, 4, 5]);
-
+        this.textureArray = params.textureArray;
         this.amplitude = params.amplitude || 64;
         this.chunks = new Map(); // "chunkX,chunkZ" -> Chunk
         this.activeChunks = new Set();
@@ -40,6 +40,9 @@ class ChunkManager {
         this.terrainBuffer;
         this.meshBuffer;
         this.workersInitialized = false;
+        this.pending = [];
+        this.processingMeshes = false;
+        this.material = this.textureArray.getMaterial();
         this.initializeWorkerPools();
     }
 
@@ -59,6 +62,8 @@ class ChunkManager {
                 block.texture.bottom.uniforms.renderFade.value = fade;
             }
         });
+        this.textureArray.material.uniforms.renderDistance.value = distance;
+        this.textureArray.material.uniforms.renderFade.value = fade;
     }
 
     initializeWorkerPools() {
@@ -154,24 +159,38 @@ class ChunkManager {
     }
 
     onMeshCompleted(data) {
-        //, waterMeshData
         const { chunkId, terrainMeshData, frameno } = data;
-
         const chunk = this.meshBuffer.pool[frameno].chunk;
-        //console.log("Mesh Data", data, this.meshBuffer.pool[frameno]);
-
-        //console.log(this.terrainMeshData);
         if (!chunk) {
             console.warn("Received mesh for unknown chunk:", chunkId);
             return;
         }
+        this.pending.push({ chunk, data: terrainMeshData });
+        this.scheduleMesh();
+    }
 
-        if (chunk.mesh) {
-            this.chunkGroup.remove(chunk.mesh);
-        }
-        chunk.onMeshCompleted(terrainMeshData); //, waterMeshData);
-        this.addChunkToScene(chunk);
-        this.pokeWorkers();
+    scheduleMesh() {
+        if (this.processingMeshes) return;
+        this.processingMeshes = true;
+
+        requestIdleCallback(
+            (deadline) => {
+                while (deadline.timeRemaining() > 0 && this.pending.length > 0) {
+                    const { chunk, data } = this.pending.shift();
+                    if (chunk.mesh) {
+                        this.chunkGroup.remove(chunk.mesh);
+                    }
+                    chunk.onMeshCompleted(data);
+                    this.addChunkToScene(chunk);
+                    this.pokeWorkers();
+                }
+                this.processingMeshes = false;
+                if (this.pending.length > 0) {
+                    this.scheduleMesh();
+                }
+            },
+            { timeout: 50 }
+        );
     }
 
     onChunkUpdated(data) {
@@ -482,7 +501,7 @@ class ChunkManager {
         delete this.terrainBuffer.pending[key];
         delete this.meshBuffer.pending[key];
 
-        this.terrainBuffer.searchAndDestroyChunk(key);
+        //this.terrainBuffer.searchAndDestroyChunk(key);
         // this.terrainBuffer.add(chunk, {
         //     type: "unloadChunk",
         //     chunkId: key,
