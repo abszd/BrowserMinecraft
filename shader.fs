@@ -18,7 +18,7 @@ void main() {
     float fogFactor = smoothstep(renderDistance - renderFade, renderDistance, length(vec2(v_worldPos.x - cameraPosition.x, v_worldPos.z - cameraPosition.z)));
     if(fogFactor >= 1.){ discard; }
 
-    vec4 texColor = texture2D(textureArray, vec3(v_uv.x, -v_uv.y, int(v_depth)));
+    vec4 texColor = texture2D(textureArray, vec3(v_uv.x, -v_uv.y, v_depth));
     
     vec3 viewDir = normalize(cameraPosition - v_worldPos);
 
