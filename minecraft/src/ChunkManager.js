@@ -172,25 +172,42 @@ class ChunkManager {
     scheduleMesh() {
         if (this.processingMeshes) return;
         this.processingMeshes = true;
-
-        requestIdleCallback(
-            (deadline) => {
-                while (deadline.timeRemaining() > 0 && this.pending.length > 0) {
-                    const { chunk, data } = this.pending.shift();
-                    if (chunk.mesh) {
-                        this.chunkGroup.remove(chunk.mesh);
+        const timeout = 50;
+        if (/^((?!chrome|android).)*safari/i.test(navigator.userAgent)) {
+            const start = performance.now();
+            while (performance.now() - start < timeout && this.pending.length > 0) {
+                const { chunk, data } = this.pending.shift();
+                if (chunk.mesh) {
+                    this.chunkGroup.remove(chunk.mesh);
+                }
+                chunk.onMeshCompleted(data);
+                this.addChunkToScene(chunk);
+                this.pokeWorkers();
+            }
+            this.processingMeshes = false;
+            if (this.pending.length > 0) {
+                this.scheduleMesh();
+            }
+        } else {
+            requestIdleCallback(
+                (deadline) => {
+                    while (deadline.timeRemaining() > 0 && this.pending.length > 0) {
+                        const { chunk, data } = this.pending.shift();
+                        if (chunk.mesh) {
+                            this.chunkGroup.remove(chunk.mesh);
+                        }
+                        chunk.onMeshCompleted(data);
+                        this.addChunkToScene(chunk);
+                        this.pokeWorkers();
                     }
-                    chunk.onMeshCompleted(data);
-                    this.addChunkToScene(chunk);
-                    this.pokeWorkers();
-                }
-                this.processingMeshes = false;
-                if (this.pending.length > 0) {
-                    this.scheduleMesh();
-                }
-            },
-            { timeout: 50 }
-        );
+                    this.processingMeshes = false;
+                    if (this.pending.length > 0) {
+                        this.scheduleMesh();
+                    }
+                },
+                { timeout: timeout }
+            );
+        }
     }
 
     onChunkUpdated(data) {
